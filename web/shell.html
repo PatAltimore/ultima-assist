@@ -21,6 +21,7 @@
   #drop.over { border-color: #fff; background: #303030; }
   button { font: inherit; padding: .3em .8em; cursor: pointer; }
   .err { color: #ff8080; min-height: 1.5em; }
+  #diag { max-width: 40em; padding: 6px 16px; text-align: center; }
   .small { font-size: .85em; color: var(--dim); }
   #legal { text-align: center; padding: 12px 16px 56px; }
   #forget { position: fixed; right: 8px; bottom: 8px; opacity: .5; display: none; }
@@ -90,6 +91,7 @@
       <p class="small">You don't need to unzip it. The <a href="https://xu4.sourceforge.net/" target="_blank" rel="noopener noreferrer">xu4 project</a>
          links to a download of the DOS version.</p>
     </div>
+    <div id="diag" class="err" role="alert" hidden></div>
     <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
   </div>
 
@@ -140,6 +142,24 @@
 
 <script src="guide-data.js"></script>
 <script>
+  // iOS Safari (and every iOS browser) has no Pointer Lock API, but Emscripten's
+  // GLFW calls document.exitPointerLock() while the game starts, which threw and
+  // stopped it from loading.  Provide no-ops where the API is missing.
+  if (typeof document.exitPointerLock !== 'function') document.exitPointerLock = function() {};
+  if (typeof Element.prototype.requestPointerLock !== 'function') Element.prototype.requestPointerLock = function() {};
+
+  // Show errors on the page: on a phone there is no console to look at.
+  (function() {
+    function show(msg) {
+      var d = document.getElementById('diag');
+      if (!d) return;
+      d.hidden = false;
+      d.textContent = 'Something went wrong: ' + msg + '. If it keeps happening, please report this message with your browser and device.';
+    }
+    window.addEventListener('error', function(e) { show(e.message || 'script error'); });
+    window.addEventListener('unhandledrejection', function(e) { show((e.reason && e.reason.message) || String(e.reason)); });
+  })();
+
   var statusEl = document.getElementById('status');
   var canvasEl = document.getElementById('canvas');
   // Filled in by build.sh (RELAY_URL); stays "@@..." in a plain local build,
