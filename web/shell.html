@@ -22,6 +22,22 @@
   button { font: inherit; padding: .3em .8em; cursor: pointer; }
   .err { color: #ff8080; min-height: 1.5em; }
   #diag { max-width: 40em; padding: 6px 16px; text-align: center; }
+
+  /* On-screen controls (touch devices, or add ?touch=1 to the address) */
+  #touch { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; box-sizing: border-box;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: rgba(16,16,16,.94); border-top: 1px solid var(--line);
+    justify-content: space-between; align-items: center; gap: 12px;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+  body.has-touch #touch { display: flex; }
+  body.has-touch #legal { padding-bottom: 190px; }
+  .tbtn { font: inherit; font-size: 18px; color: #eee; background: #262626; border: 1px solid #555; border-radius: 10px;
+    padding: 0; touch-action: none; -webkit-user-select: none; user-select: none; }
+  .tbtn.pressed { background: #3a4a66; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px); gap: 4px; }
+  .dpad .up { grid-area: 1 / 2; } .dpad .left { grid-area: 2 / 1; } .dpad .right { grid-area: 2 / 3; } .dpad .down { grid-area: 3 / 2; }
+  .acts { display: grid; grid-template-columns: repeat(2, minmax(76px, 110px)); grid-auto-rows: 50px; gap: 6px; }
+  .acts .tbtn { font-size: 15px; }
+  #kb { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; font-size: 16px; }
   .small { font-size: .85em; color: var(--dim); }
   #legal { text-align: center; padding: 12px 16px 56px; }
   #forget { position: fixed; right: 8px; bottom: 8px; opacity: .5; display: none; }
@@ -133,6 +149,21 @@
     </div>
   </aside>
 </div>
+<div id="touch" aria-label="On-screen controls">
+  <div class="dpad">
+    <button type="button" class="tbtn up" data-key="up" data-repeat="1" aria-label="Up">&#9650;</button>
+    <button type="button" class="tbtn left" data-key="left" data-repeat="1" aria-label="Left">&#9664;</button>
+    <button type="button" class="tbtn right" data-key="right" data-repeat="1" aria-label="Right">&#9654;</button>
+    <button type="button" class="tbtn down" data-key="down" data-repeat="1" aria-label="Down">&#9660;</button>
+  </div>
+  <div class="acts">
+    <button type="button" class="tbtn" data-key="enter">Enter</button>
+    <button type="button" class="tbtn" data-key="space">Space</button>
+    <button type="button" class="tbtn" data-key="esc">Esc</button>
+    <button type="button" class="tbtn" id="kbBtn" aria-label="Open the keyboard">Keys</button>
+  </div>
+</div>
+<input id="kb" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Keyboard input">
 <footer id="legal" class="small">
   Unofficial, open-source browser build of <a href="https://github.com/xu4-engine/u4" target="_blank" rel="noopener noreferrer">xu4</a> (GPL-3.0).
   Not affiliated with EA or Origin. No game data is included.
@@ -159,6 +190,83 @@
     window.addEventListener('error', function(e) { show(e.message || 'script error'); });
     window.addEventListener('unhandledrejection', function(e) { show((e.reason && e.reason.message) || String(e.reason)); });
   })();
+
+  // On-screen controls.  The engine reads keys through GLFW's window key
+  // listeners, so the buttons (and the phone keyboard, via the hidden #kb
+  // input) inject synthetic key events on window.
+  var Touch = {
+    CODES: { up: 38, down: 40, left: 37, right: 39, enter: 13, space: 32, esc: 27, back: 8 },
+    PUNCT: { '.': 190, ',': 188, '-': 189, "'": 222, ';': 186, '/': 191 },
+    fire: function(type, kc, shift) {
+      var e = new KeyboardEvent(type, { bubbles: true, cancelable: true, keyCode: kc, which: kc, shiftKey: !!shift });
+      // Some engines ignore keyCode in the init dictionary.
+      if (e.keyCode !== kc) {
+        try { Object.defineProperty(e, 'keyCode', { get: function() { return kc; } }); Object.defineProperty(e, 'which', { get: function() { return kc; } }); } catch (x) {}
+      }
+      window.dispatchEvent(e);
+    },
+    tap: function(kc, shift) {
+      var self = this;
+      this.fire('keydown', kc, shift);
+      setTimeout(function() { self.fire('keyup', kc, shift); }, 45);
+    },
+    typeChar: function(ch) {
+      if (ch === ' ') return this.tap(32);
+      if (/[a-z]/i.test(ch)) return this.tap(ch.toUpperCase().charCodeAt(0), ch !== ch.toLowerCase());
+      if (/[0-9]/.test(ch)) return this.tap(ch.charCodeAt(0));
+      if (this.PUNCT[ch]) this.tap(this.PUNCT[ch]);
+    },
+    init: function() {
+      var self = this, kb = document.getElementById('kb');
+      var wanted = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || /[?&]touch=1/.test(location.search);
+      if (!wanted) return;
+      document.body.classList.add('has-touch');
+
+      document.querySelectorAll('#touch [data-key]').forEach(function(b) {
+        var kc = self.CODES[b.getAttribute('data-key')], timer = null, rep = null;
+        function stop() {
+          clearTimeout(timer); clearInterval(rep); timer = rep = null;
+          b.classList.remove('pressed');
+        }
+        b.addEventListener('pointerdown', function(e) {
+          e.preventDefault();                        // no focus change, no ghost click, no zoom
+          try { b.setPointerCapture(e.pointerId); } catch (x) {}
+          b.classList.add('pressed');
+          self.tap(kc);
+          if (b.getAttribute('data-repeat')) {       // hold to keep walking
+            timer = setTimeout(function() { rep = setInterval(function() { self.tap(kc); }, 170); }, 380);
+          }
+        });
+        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(t) { b.addEventListener(t, stop); });
+        b.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+      });
+
+      // Phone keyboard: focus the hidden input and forward what is typed.
+      document.getElementById('kbBtn').addEventListener('click', function() {
+        if (document.activeElement === kb) kb.blur(); else kb.focus();
+      });
+      kb.addEventListener('beforeinput', function(e) {
+        var t = e.inputType;
+        if (t === 'deleteContentBackward') { self.tap(self.CODES.back); e.preventDefault(); }
+        else if (t === 'insertLineBreak' || t === 'insertParagraph') { self.tap(self.CODES.enter); e.preventDefault(); }
+        else if (t === 'insertText' && e.data) { for (var i = 0; i < e.data.length; i++) self.typeChar(e.data.charAt(i)); e.preventDefault(); }
+      });
+      kb.addEventListener('input', function() { kb.value = ''; });
+    }
+  };
+  // Keep the engine's own key listeners (registered later, on window) from
+  // reacting to keys typed into #kb: those are forwarded by Touch above.
+  ['keydown', 'keyup', 'keypress'].forEach(function(type) {
+    window.addEventListener(type, function(e) {
+      var kb = document.getElementById('kb');
+      if (e.target !== kb) return;
+      if (type === 'keydown') {
+        var map = { Enter: 13, Backspace: 8, Escape: 27, ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39 };
+        if (map[e.key]) { Touch.tap(map[e.key]); e.preventDefault(); }
+      }
+      e.stopImmediatePropagation();
+    }, true);
+  });
 
   var statusEl = document.getElementById('status');
   var canvasEl = document.getElementById('canvas');
@@ -298,6 +406,7 @@
       });
       window.addEventListener('pagehide', function() { self.sync(); Assist.save(); });
       Assist.init();
+      Touch.init();
       canvasEl.focus();
       Module.callMain([]);
     }
