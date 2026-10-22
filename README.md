@@ -35,7 +35,7 @@ cd dist && python -m http.server 8090   # open http://localhost:8090/index.html
 
 Pushing to `main` runs `.github/workflows/pages.yml`, which installs Emscripten 6.0.6, runs `bash build.sh`, and deploys `dist/` to GitHub Pages. One-time setup in the repository: **Settings → Pages → Source: GitHub Actions**. The site works from a project path such as `https://<user>.github.io/ultima-assist/` because every URL is relative. The workflow passes the repository URL to `build.sh`, which writes it into the published `NOTICE.txt` so the GPL source offer points at the right place.
 
-Players supply their own `ultima4.zip` on first visit; nothing about the game data is stored on the server.
+Players supply their own `ultima4.zip` on first visit, either by choosing it or, if the relay is set up, with the opt-in "Download it for me" button. Nothing about the game data is stored on the server. The relay deploys with `.github/workflows/relay.yml`; set the repository variable `RELAY_URL` so the Pages build shows the button (steps in `relay/README.md`).
 
 ## Page behavior
 

@@ -39,6 +39,7 @@ jobs:
       - name: Build (Boron, game modules, engine, site folder)
         env:
           SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+          RELAY_URL: ${{ vars.RELAY_URL }}
         run: |
           source tools/emsdk/emsdk_env.sh
           bash build.sh

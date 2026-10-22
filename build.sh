@@ -23,6 +23,7 @@ bash link-xu4.sh dist
 cp NOTICE.md dist/NOTICE.txt
 cp engine/COPYING dist/LICENSE-xu4-GPL-3.0.txt
 cp deps/boron/LICENSE dist/LICENSE-boron-LGPL.txt
+sed -i "s|@@RELAY_URL@@|${RELAY_URL:-}|g" dist/index.html
 # CI passes SOURCE_URL (the repository this site is built from).
 sed -i "s|@@SOURCE_URL@@|${SOURCE_URL:-the repository this site was built from}|g" dist/NOTICE.txt
 

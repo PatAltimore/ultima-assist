@@ -1,0 +1,6 @@
+{
+  "name": "ultima-assist-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Relays one fixed, hash-pinned file (ultima4.zip) so the browser can fetch it despite CORS. See ultima4/index.js."
+}

@@ -81,6 +81,11 @@
         <button id="pick" type="button">Choose ultima4.zip&hellip;</button>
         <input id="zipInput" type="file" accept=".zip" hidden>
       </div>
+      <div id="relayBox" hidden>
+        <button id="relayGo" type="button">Download it for me</button>
+        <p class="small">This fetches the game file from a third-party host through a small relay run for this site,
+           checks it, and keeps it only in your browser. The game remains the property of its rights holders.</p>
+      </div>
       <div class="err" id="loaderErr"></div>
       <p class="small">You don't need to unzip it. The <a href="https://xu4.sourceforge.net/" target="_blank" rel="noopener noreferrer">xu4 project</a>
          links to a download of the DOS version.</p>
@@ -137,6 +142,9 @@
 <script>
   var statusEl = document.getElementById('status');
   var canvasEl = document.getElementById('canvas');
+  // Filled in by build.sh (RELAY_URL); stays "@@..." in a plain local build,
+  // which hides the "Download it for me" button.
+  var RELAY_URL = '@@RELAY_URL@@';
 
   var Module = {
     noInitialRun: true,
@@ -172,6 +180,10 @@
       });
       var input = this.el('zipInput'), drop = this.el('drop');
       this.el('pick').onclick = function() { input.click(); };
+      if (RELAY_URL && RELAY_URL.charAt(0) !== '@') {
+        this.el('relayBox').hidden = false;
+        this.el('relayGo').onclick = function() { self.relayDownload(); };
+      }
       input.onchange = function() { if (input.files.length) self.addFile(input.files[0]); input.value = ''; };
       drop.ondragover = function(e) { e.preventDefault(); drop.classList.add('over'); };
       drop.ondragleave = function() { drop.classList.remove('over'); };
@@ -199,6 +211,23 @@
       this.el('loader').style.display = 'block';
     },
     setError: function(m) { this.el('loaderErr').textContent = m; },
+    // Opt-in automatic download through the relay; addFile() validates the result.
+    relayDownload: async function() {
+      var btn = this.el('relayGo');
+      btn.disabled = true;
+      this.setError('Downloading...');
+      try {
+        var r = await fetch(RELAY_URL);
+        if (!r.ok) throw new Error('relay status ' + r.status);
+        var buf = await r.arrayBuffer();
+        this.setError('');
+        await this.addFile(new File([buf], 'ultima4.zip'));
+      } catch (e) {
+        console.warn('Relay download failed: ' + e.message);
+        this.setError("Couldn't download it automatically. Please get ultima4.zip yourself and choose it above.");
+      }
+      btn.disabled = false;
+    },
     addFile: async function(f) {
       this.setError('');
       var bytes = new Uint8Array(await f.arrayBuffer());
