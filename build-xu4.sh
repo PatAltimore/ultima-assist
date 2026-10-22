@@ -12,8 +12,8 @@ OUT=${OUT:-build}
 mkdir -p "$OUT"
 COMMON="${OPT:--O2} -w -sUSE_GLFW=3 -sUSE_LIBPNG=1 -sUSE_ZLIB=1 -DUSE_GLES -DUSE_BORON -DCONF_MODULE -DNDEBUG -DVERSION=\"DR-1.0\" -I$SRC -I$SRC/support -I$SRC/lzw -I$BOR/include -I$BOR/include/boron"
 
-CSRCS="lzw/hash.c lzw/lzw.c support/notify.c support/stringTable.c support/txf_draw.c support/unzip.c module.c support/cdi.c"
-CXXSRCS="annotation aura camp cheat city codex combat controller context creature death debug direction discourse dungeon dungeonview error event filesystem game gamebrowser gui image imageloader imagemgr imageview intro item location map maploader menu menuitem names object party person portal progress_bar rle savegame scale screen screen_glfw settings shrine sound_null assist spell stats textview tile tileanim tileset tileview u4file view xu4 lzw/u4decode lzw/u6decode config_boron"
+CSRCS="lzw/hash.c lzw/lzw.c support/notify.c support/stringTable.c support/txf_draw.c support/unzip.c module.c support/cdi.c support/stb_vorbis.c support/sfx_gen.c"
+CXXSRCS="annotation aura camp cheat city codex combat controller context creature death debug direction discourse dungeon dungeonview error event filesystem game gamebrowser gui image imageloader imagemgr imageview intro item location map maploader menu menuitem names object party person portal progress_bar rle savegame scale screen screen_glfw settings shrine sound_web assist spell stats textview tile tileanim tileset tileview u4file view xu4 lzw/u4decode lzw/u6decode config_boron"
 
 JOBS=$(nproc 2>/dev/null || echo 4)
 fail=0
@@ -28,7 +28,12 @@ run() {
 
 for f in $CSRCS; do
   echo "CC  $f"
-  run emcc $COMMON -c "$SRC/$f" -o "$OUT/$(echo $f | tr / _).o"
+  case "$f" in
+    support/stb_vorbis.c) EXTRA="-DSTB_VORBIS_NO_STDIO -DSTB_VORBIS_NO_PUSHDATA_API" ;;
+    support/sfx_gen.c)    EXTRA="-DCONFIG_SFX_NO_FILEIO -DCONFIG_SFX_NO_GENERATORS -DSINGLE_FORMAT=3" ;;
+    *)                    EXTRA="" ;;
+  esac
+  run emcc $COMMON $EXTRA -c "$SRC/$f" -o "$OUT/$(echo $f | tr / _).o"
 done
 for f in $CXXSRCS; do
   echo "CXX $f"

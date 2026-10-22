@@ -12,7 +12,7 @@ EXTRA=()
 em++ ${BUILD:-build}/*.o deps/out/libboron.a -O2 -sUSE_GLFW=3 -sUSE_LIBPNG=1 -sUSE_ZLIB=1 \
   -sFULL_ES3=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sASYNCIFY -sASYNCIFY_STACK_SIZE=262144 -sSTACK_SIZE=1MB \
   -sINITIAL_MEMORY=128MB -sALLOW_MEMORY_GROWTH -sFORCE_FILESYSTEM -lidbfs.js ${LDOPT:--O2} \
-  --shell-file web/shell.html -sEXPORTED_RUNTIME_METHODS=callMain,FS,ENV,UTF8ToString \
+  --js-library engine/src/sound_web.js --shell-file web/shell.html -sEXPORTED_RUNTIME_METHODS=callMain,FS,ENV,UTF8ToString \
   --preload-file engine/Ultima-IV.mod@/Ultima-IV.mod \
   --preload-file engine/render.pak@/render.pak "${EXTRA[@]}" -o "$OUT/index.html"
 cp web/guide-data.js "$OUT/guide-data.js"

@@ -17,10 +17,12 @@ The "Download it for me" button fetches the game file through a small relay (`re
 | Part | What | Licence |
 | --- | --- | --- |
 | [xu4](https://github.com/xu4-engine/u4) | The game engine, commit `6a7ee3d0079cfdc1c8fb9ba7a3c710a957155a71`, in `engine/` | GPL-3.0-or-later (see `engine/COPYING`; some files carry GPL-2.0-or-later headers) |
-| xu4 changes | WebGL2 and browser input/storage changes (`patches/xu4-emscripten.patch`), plus new `engine/src/assist.cpp` and `engine/src/sound_null.cpp` | GPL-3.0-or-later |
+| xu4 changes | WebGL2 and browser input/storage changes (`patches/xu4-emscripten.patch`), plus new `engine/src/assist.cpp`, `engine/src/sound_web.cpp` and `engine/src/sound_web.js` (Web Audio sound backend) | GPL-3.0-or-later |
 | [Boron](https://codeberg.org/wickedsmoke/boron) | Scripting language embedded in xu4, commit `b0c1305e7b4ff11a0ee2aef3b97a2a95f4afe4b2`, in `deps/boron/` | LGPL-3.0 (see `deps/boron/LICENSE`) |
 | `web/`, `tools/`, `relay/`, build scripts | The page, the assist sidebar, build tooling | GPL-3.0-or-later |
 | `web/guide-data.js` | Town, dungeon, shrine and item coordinates, generated from xu4's `module/Ultima-IV/maps.b` by `tools/gen-guide.py` | GPL-3.0-or-later (derived from xu4 data) |
+| [stb_vorbis](https://github.com/nothings/stb) | Ogg Vorbis decoder (`engine/src/support/stb_vorbis.c`, v1.22, stb commit `a7d4c2175630e1ea5b6f8dd00ab96fed0b97b96d`) | Public domain or MIT (your choice) |
+| sfx_gen | Sound effect synthesizer for the game's `.rfx` effects (`engine/src/support/sfx_gen.c/.h`), from [Faun](https://codeberg.org/wickedsmoke/faun) commit `ac263d95f64a1578c629694a1afbabcbdf8adb78`, a C version of DrPetter's sfxr | MIT |
 | [Emscripten](https://emscripten.org/) | Compiler toolchain. Its GLFW, libpng and zlib ports are linked into the build | MIT / zlib / libpng licences |
 
 The licence texts for xu4 and Boron are published next to the site as `LICENSE-xu4-GPL-3.0.txt` and `LICENSE-boron-LGPL.txt`.

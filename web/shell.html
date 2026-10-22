@@ -37,11 +37,17 @@
   .dpad .up { grid-area: 1 / 2; } .dpad .left { grid-area: 2 / 1; } .dpad .right { grid-area: 2 / 3; } .dpad .down { grid-area: 3 / 2; }
   .acts { display: grid; grid-template-columns: repeat(2, minmax(76px, 110px)); grid-auto-rows: 50px; gap: 6px; }
   .acts .tbtn { font-size: 15px; }
+  #sndBtn { position: fixed; left: 8px; bottom: 8px; z-index: 11; display: none; padding: .2em .55em; font-size: 18px; line-height: 1.2;
+    background: rgba(38,38,38,.9); color: #eee; border: 1px solid #555; border-radius: 10px; touch-action: manipulation; }
+  body.started #sndBtn { display: block; }
+  body.no-audio #sndBtn { display: none !important; }
+  .snd { display: grid; grid-template-columns: 4.5em 1fr; gap: 4px 8px; align-items: center; font-size: .9em; }
+  .snd input[type=range] { width: 100%; }
   #kb { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; font-size: 16px; }
   .small { font-size: .85em; color: var(--dim); }
   #legal { text-align: center; padding: 12px 16px 56px; }
-  #forget { position: fixed; right: 8px; bottom: 8px; opacity: .5; display: none; }
-  #forget:hover { opacity: 1; }
+  #forget { display: none; }
+  body.has-touch #sndBtn { bottom: 200px; }
 
   /* Assist sidebar */
   #assist { display: none; flex: 0 0 340px; max-width: 100%; background: var(--panel); border: 1px solid var(--line);
@@ -67,6 +73,13 @@
   .hint { background: #222; border-left: 3px solid var(--warn); padding: 4px 8px; margin: 4px 0; font-size: .9em; }
   .next { background: #1d2430; border-left: 3px solid #6aa0e0; padding: 4px 8px; margin: 4px 0; font-size: .9em; }
   .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  #tabs { display: flex; gap: 4px; position: sticky; top: -10px; z-index: 2; margin: -10px -12px 10px; padding: 8px 12px 0;
+    background: var(--panel); border-bottom: 1px solid var(--line); }
+  #tabs [role=tab] { flex: 1; font: inherit; font-size: .95em; color: var(--dim); background: transparent; border: 1px solid transparent;
+    border-bottom: 0; border-radius: 8px 8px 0 0; padding: .45em .5em; cursor: pointer; }
+  #tabs [role=tab][aria-selected=true] { color: #fff; background: #242424; border-color: var(--line); margin-bottom: -1px; }
+  #tabs [role=tab]:focus-visible { outline: 2px solid #6aa0e0; outline-offset: -2px; }
+  .badge { display: inline-block; min-width: 1.2em; padding: 0 .35em; border-radius: 10px; background: var(--warn); color: #111; font-size: .75em; font-weight: 600; text-align: center; }
   #waiting { color: var(--dim); }
   details { margin: 4px 0; }
   details > summary { cursor: pointer; color: #cfcfcf; }
@@ -114,38 +127,64 @@
   <aside id="assist" aria-label="Assist mode">
     <div id="waiting">Assist mode starts once you begin or load a game.</div>
     <div id="live" hidden>
-      <h2>Where you are</h2>
-      <div id="loc"></div>
-      <div id="townbox"></div>
-      <h2>Party</h2>
-      <div id="party"></div>
-      <h2>Supplies</h2>
-      <div id="supplies"></div>
-      <h2>Hints</h2>
-      <div id="hints"></div>
-      <h2>Quest</h2>
-      <div id="steps"></div>
-      <div id="checklist"></div>
-      <h2>Map</h2>
-      <canvas id="automap" width="256" height="256"></canvas>
-      <div class="legend">
-        <span><i style="background:#e0c040"></i>Town</span><span><i style="background:#e06060"></i>Dungeon</span>
-        <span><i style="background:#50d0e0"></i>Shrine</span><span><i style="background:#c080e0"></i>Moongate</span>
-        <span><i style="background:#fff"></i>You</span>
+      <div id="tabs" role="tablist" aria-label="Assist sections">
+        <button type="button" role="tab" id="tab-status" data-tab="status" aria-controls="panel-status" aria-selected="true">Status</button>
+        <button type="button" role="tab" id="tab-explore" data-tab="explore" aria-controls="panel-explore" aria-selected="false" tabindex="-1">Explore <span id="hintBadge" class="badge" hidden></span></button>
+        <button type="button" role="tab" id="tab-quest" data-tab="quest" aria-controls="panel-quest" aria-selected="false" tabindex="-1">Quest</button>
       </div>
-      <label class="small"><input type="checkbox" id="showAll"> Show the whole map (spoilers)</label>
-      <h2>Virtues</h2>
-      <div id="virtues"></div>
-      <h2>Quest items</h2>
-      <div id="quest"></div>
-      <h2>Assist</h2>
-      <div class="actions">
-        <button type="button" data-act="heal">Heal party</button>
-        <button type="button" data-act="food">+10 food</button>
-        <button type="button" data-act="gold">+500 gold</button>
-      </div>
-      <p class="small">Changes show on the game screen after your next move.
-         Locations come from the game's own map data.</p>
+
+      <section id="panel-status" role="tabpanel" aria-labelledby="tab-status">
+        <h2>Where you are</h2>
+        <div id="loc"></div>
+        <div id="townbox"></div>
+        <h2>Party</h2>
+        <div id="party"></div>
+        <h2>Supplies</h2>
+        <div id="supplies"></div>
+      </section>
+
+      <section id="panel-explore" role="tabpanel" aria-labelledby="tab-explore" hidden>
+        <h2>Map</h2>
+        <canvas id="automap" width="256" height="256"></canvas>
+        <div class="legend">
+          <span><i style="background:#e0c040"></i>Town</span><span><i style="background:#e06060"></i>Dungeon</span>
+          <span><i style="background:#50d0e0"></i>Shrine</span><span><i style="background:#c080e0"></i>Moongate</span>
+          <span><i style="background:#fff"></i>You</span>
+        </div>
+        <label class="small"><input type="checkbox" id="showAll"> Show the whole map (spoilers)</label>
+        <h2>Hints</h2>
+        <div id="hints"></div>
+        <h2>Assist</h2>
+        <div class="actions">
+          <button type="button" data-act="heal">Heal party</button>
+          <button type="button" data-act="food">+10 food</button>
+          <button type="button" data-act="gold">+500 gold</button>
+        </div>
+        <p class="small">Changes show on the game screen after your next move.
+           Locations come from the game's own map data.</p>
+        <h2>Sound</h2>
+        <div id="sndPanel">
+        <div class="snd">
+          <label for="sndMute">Mute</label><input type="checkbox" id="sndMute">
+          <label for="sndMusic">Music</label><input type="range" id="sndMusic" min="0" max="100" step="5">
+          <label for="sndSfx">Effects</label><input type="range" id="sndSfx" min="0" max="100" step="5">
+        </div>
+        <p class="small">Sound starts after your first click, tap or key press.</p>
+        </div>
+        <h2>Data</h2>
+        <button id="forget" type="button">Forget game data</button>
+        <p class="small">Removes the stored game, saved games and map progress from this browser.</p>
+      </section>
+
+      <section id="panel-quest" role="tabpanel" aria-labelledby="tab-quest" hidden>
+        <h2>Quest</h2>
+        <div id="steps"></div>
+        <div id="checklist"></div>
+        <h2>Virtues</h2>
+        <div id="virtues"></div>
+        <h2>Quest items</h2>
+        <div id="quest"></div>
+      </section>
     </div>
   </aside>
 </div>
@@ -169,7 +208,7 @@
   Not affiliated with EA or Origin. No game data is included.
   <a href="NOTICE.txt">Source and licences</a>
 </footer>
-<button id="forget" type="button" title="Remove the stored game data and saves from this browser">Forget game data</button>
+<button id="sndBtn" type="button" aria-label="Sound on or off" title="Sound on or off">&#128266;</button>
 
 <script src="guide-data.js"></script>
 <script>
@@ -266,6 +305,99 @@
       }
       e.stopImmediatePropagation();
     }, true);
+  });
+
+  // Sidebar tabs (Status / Explore / Quest); the choice is remembered.
+  var Tabs = {
+    KEY: 'ultima-assist.tab.v1',
+    names: ['status', 'explore', 'quest'],
+    show: function(name) {
+      var self = this;
+      if (this.names.indexOf(name) < 0) name = 'status';
+      this.names.forEach(function(n) {
+        var on = n === name;
+        var tab = document.getElementById('tab-' + n);
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        tab.tabIndex = on ? 0 : -1;
+        document.getElementById('panel-' + n).hidden = !on;
+      });
+      try { localStorage.setItem(this.KEY, name); } catch (e) {}
+      document.getElementById('assist').scrollTop = 0;
+    },
+    init: function() {
+      var self = this, saved = 'status';
+      try { saved = localStorage.getItem(this.KEY) || 'status'; } catch (e) {}
+      this.names.forEach(function(n) {
+        var tab = document.getElementById('tab-' + n);
+        tab.addEventListener('click', function() { self.show(n); });
+        tab.addEventListener('keydown', function(e) {
+          var i = self.names.indexOf(n), j = -1;
+          if (e.key === 'ArrowRight') j = (i + 1) % self.names.length;
+          else if (e.key === 'ArrowLeft') j = (i + self.names.length - 1) % self.names.length;
+          else if (e.key === 'Home') j = 0;
+          else if (e.key === 'End') j = self.names.length - 1;
+          if (j >= 0) { e.preventDefault(); self.show(self.names[j]); document.getElementById('tab-' + self.names[j]).focus(); }
+        });
+      });
+      this.show(saved);
+    }
+  };
+
+  // Sound: the engine plays through Web Audio (engine/src/sound_web.*), which stays
+  // silent until audio is unlocked from a user gesture.  This keeps the player's
+  // mute and volume choices and unlocks audio on the first interaction.
+  var Sound = {
+    KEY: 'ultima-assist.sound.v1',
+    st: { mute: false, music: 0.6, sfx: 0.8 },
+    el: function(id) { return document.getElementById(id); },
+    api: function() { return Module && Module.WebAudio; },
+    unlock: function() { var a = this.api(); if (a) a.unlock(); },
+    load: function() {
+      try {
+        var o = JSON.parse(localStorage.getItem(this.KEY) || 'null');
+        if (o) {
+          if (typeof o.mute === 'boolean') this.st.mute = o.mute;
+          if (typeof o.music === 'number') this.st.music = o.music;
+          if (typeof o.sfx === 'number') this.st.sfx = o.sfx;
+        }
+      } catch (e) {}
+    },
+    save: function() { try { localStorage.setItem(this.KEY, JSON.stringify(this.st)); } catch (e) {} },
+    apply: function() {
+      var a = this.api();
+      if (a) a.setUi(this.st);
+      this.el('sndBtn').innerHTML = this.st.mute ? '&#128263;' : '&#128266;';
+      this.el('sndMute').checked = this.st.mute;
+      this.el('sndMusic').value = Math.round(this.st.music * 100);
+      this.el('sndSfx').value = Math.round(this.st.sfx * 100);
+    },
+    init: function() {
+      var self = this;
+      if (!(window.AudioContext || window.webkitAudioContext)) {
+        document.body.classList.add('no-audio');
+        this.el('sndPanel').innerHTML = '<p class="small">This browser has no Web Audio support, so the game stays silent.</p>';
+        return;
+      }
+      this.load();
+      this.apply();
+      this.el('sndBtn').onclick = function() { self.st.mute = !self.st.mute; self.save(); self.apply(); self.unlock(); };
+      this.el('sndMute').onchange = function() { self.st.mute = this.checked; self.save(); self.apply(); self.unlock(); };
+      this.el('sndMusic').oninput = function() { self.st.music = this.value / 100; self.save(); self.apply(); self.unlock(); };
+      this.el('sndSfx').oninput = function() { self.st.sfx = this.value / 100; self.save(); self.apply(); self.unlock(); };
+    }
+  };
+  // The game uses the arrow keys and Space; don't let them scroll the page.
+  window.addEventListener('keydown', function(e) {
+    var t = e.target, tag = t && t.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+    if (t && t.getAttribute && t.getAttribute('role') === 'tab') return;
+    if (typeof Ultima === 'undefined' || !Ultima.started) return;
+    if ([32, 33, 34, 35, 36, 37, 38, 39, 40].indexOf(e.keyCode) >= 0) e.preventDefault();
+  });
+  // Browsers only allow audio after a gesture; keep listening so a suspended
+  // context (phone call, tab switch) is resumed on the next interaction.
+  ['click', 'touchend', 'pointerup', 'keydown'].forEach(function(t) {
+    window.addEventListener(t, function() { Sound.unlock(); }, true);
   });
 
   var statusEl = document.getElementById('status');
@@ -407,6 +539,9 @@
       window.addEventListener('pagehide', function() { self.sync(); Assist.save(); });
       Assist.init();
       Touch.init();
+      Sound.init();
+      Tabs.init();
+      document.body.classList.add('started');
       canvasEl.focus();
       Module.callMain([]);
     }
@@ -676,6 +811,9 @@
       if (S.party.some(function(p) { return p.status === 'P'; })) hints.push('Someone is poisoned. Cast Cure (Garlic + Ginseng) or visit a healer.');
       if (S.party.some(function(p) { return p.status === 'D'; })) hints.push('A party member is dead. A healer can resurrect them.');
       if (S.party.length === 1) hints.push('You are alone. Companions can be recruited from the towns.');
+      var badge = this.el('hintBadge');
+      badge.textContent = hints.length;
+      badge.hidden = !hints.length;
       this.el('hints').innerHTML = hints.length ? hints.map(function(h) { return '<div class="hint">' + e(h) + '</div>'; }).join('') :
         '<div class="small">No warnings right now.</div>';
 

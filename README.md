@@ -2,6 +2,8 @@
 
 A browser build of *Ultima IV* (the open-source [xu4](https://github.com/xu4-engine/u4) engine compiled to WebAssembly) with an "assist mode" sidebar: live party and supplies, per-town guides, a quest checklist with next steps, and an automap of the places you've visited.
 
+Try it live on [GitHub Pages](https://pataltimore.github.io/ultima-assist/).
+
 ## What's here
 
 - `engine/` — [xu4](https://github.com/xu4-engine/u4) at commit `6a7ee3d0079cfdc1c8fb9ba7a3c710a957155a71` (5 Jun 2025), vendored. `patches/xu4-emscripten.patch` is the diff against that commit for the files that already existed. Changes:
@@ -9,7 +11,7 @@ A browser build of *Ultima IV* (the open-source [xu4](https://github.com/xu4-eng
   - `src/support/getTicks.c`, `src/screen_glfw.cpp`: `emscripten_sleep` in `msecSleep()` and the GLFW event poll, so the blocking game loop yields to the browser (without it the tab freezes).
   - `src/screen_glfw.cpp`: GLFW callbacks only queue events under Emscripten; `handleInputEvents()` replays them on the main stack. xu4's handlers start nested blocking loops (e.g. the new-game name prompt), and `emscripten_sleep()` from a browser-driven callback while `main()` is already suspended by Asyncify corrupted memory. That was the "memory access out of bounds" crash.
   - `src/settings.cpp`: under Emscripten the save/settings directory is `/xu4home/`, which the page mounts as persistent browser storage.
-  - New files: `src/assist.cpp` (`assist_*` exports that read the live savegame and location, plus heal/food/gold actions) and `src/sound_null.cpp` (silent sound backend; the real one needs Faun/Vorbis).
+  - New files: `src/assist.cpp` (`assist_*` exports that read the live savegame and location, plus heal/food/gold actions) and `src/sound_web.cpp` + `src/sound_web.js` (Web Audio backend that replaces the native Faun/libvorbis one; see Sound below).
   - The legacy SDL backend (`screen_sdl.cpp`) is stale and not used.
 - `deps/boron/` — [Boron](https://codeberg.org/wickedsmoke/boron) at commit `b0c1305e7b4ff11a0ee2aef3b97a2a95f4afe4b2` (LGPL), the scripting language xu4 embeds, vendored.
 - `web/shell.html` — the page: `ultima4.zip` upload (validated, kept in IndexedDB), persistent saves, auto-start on later visits, the assist sidebar, "Forget game data".
@@ -39,9 +41,13 @@ Players supply their own `ultima4.zip` on first visit, either by choosing it or,
 
 First visit shows the `ultima4.zip` picker; bad files are rejected (not a zip, or no `AVATAR.EXE` inside). After that the zip and saves persist across reloads, the game starts straight away, and "Journey Onward" resumes the saved party.
 
+## Sound
+
+Effects and music are read from the game module and decoded in the engine: Ogg Vorbis with stb_vorbis, WAV by hand, and the `.rfx` effects with sfx_gen (a C version of sfxr). Effects are decoded once; music is streamed in small chunks that a page timer tops up, and loops. Everything goes through Web Audio. Audio stays locked until the first click, tap or key press (browsers require a gesture), then music starts. A speaker button (bottom left) and the Explore tab have mute and separate music/effects volume, remembered in `localStorage`; the game's own volume settings still apply. Browsers without Web Audio simply stay silent. On iPhones the ringer switch also silences Web Audio.
+
 ## Assist sidebar
 
-- **Where you are / Party / Supplies / Hints / Virtues / Quest items:** live from the `assist_*` exports.
+The sidebar has three tabs, remembered between visits: **Status** (where you are with the town guide, party, supplies), **Explore** (automap, hints with a count badge, assist buttons, sound, forget data) and **Quest** (checklist and next steps, virtues, quest items). Everything is live from the `assist_*` exports.
 - **Town guide:** in a town, castle or village it lists the services (healer, inn, shops, companion), and any rune or quest item marked there, with the direction from where you stand (for example "Rune of Honesty at (8, 6): 9 north, 7 east"; confirmed in-game by walking there and pressing S). Dungeons show their stone; shrines show the mantra.
 - **Quest checklist:** runes, virtues (raise to 99, then meditate 3 cycles with the mantra), stones, the bell/book/candle/horn/wheel/skull, the three key parts and the Abyss steps, with the next three things to do. The rules come from the engine source (`item.cpp`, `shrine.cpp`, `party.cpp`).
 - **Automap:** the real overworld terrain (read from the engine), revealed as you explore (radius 5), with towns, dungeons, shrines and moongates marked, filled in once visited. Hover for names; a checkbox shows the whole map. Progress is kept in the browser (`localStorage`) and cleared by "Forget game data".
@@ -53,4 +59,4 @@ First visit shows the `ultima4.zip` picker; bad files are rejected (not a zip, o
 - The shrine of Spirituality has no overworld entrance in the map data, so its location isn't listed.
 - The "assist" buttons only edit the savegame, so the game's own status area lags until the next move.
 - The first keypress after the title screen is sometimes ignored.
-- No sound (Faun/Vorbis), no optional `u4upgrad.zip` graphics, no mouse or touch input.
+- No optional `u4upgrad.zip` graphics, no mouse input in the game itself (touch has on-screen controls), and no spoken dialogue (the module has none).
