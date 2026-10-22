@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 source tools/emenv.sh
 
 cd deps/boron
-[ -f config.opt ] || ./configure --no-readline --no-socket --no-execute --static
+[ -f config.opt ] || bash ./configure --no-readline --no-socket --no-execute --static
 CONFIG="$(cat config.opt)"
 CFLAGS="-O2 -std=gnu99 -Iinclude -Iinclude/boron -Iurlan -Ieval -Isupport -sUSE_ZLIB=1 -w $CONFIG"
 OBJ_FN="env array binary block coord date path string context gc serialize tokenize vector parse_block parse_string str mem_util quickSortIndex fpconv os boron port_file wait hashmap well512 random"
