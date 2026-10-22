@@ -1,0 +1,197 @@
+diff --git a/src/gpu_opengl.cpp b/src/gpu_opengl.cpp
+index 882a30c..34cd71b 100644
+--- a/src/gpu_opengl.cpp
++++ b/src/gpu_opengl.cpp
+@@ -42,6 +42,9 @@ extern uint32_t getTicks();
+ #ifdef ANDROID
+ #define DVERSION    "#version 310 es\n"
+ #define PRECISION_F "precision mediump float;\n"
++#elif defined(__EMSCRIPTEN__)
++#define DVERSION    "#version 300 es\n"   // ultima-assist: WebGL2
++#define PRECISION_F "precision highp float;\n"
+ #elif defined(USE_GLES)
+ #define DVERSION    "#version 310 es\n"
+ #define PRECISION_F "precision highp float;\n"
+diff --git a/src/gpu_opengl.h b/src/gpu_opengl.h
+index e0f2842..528be17 100644
+--- a/src/gpu_opengl.h
++++ b/src/gpu_opengl.h
+@@ -1,4 +1,6 @@
+-#ifdef __APPLE__
++#ifdef __EMSCRIPTEN__
++#include <GLES3/gl3.h>   // ultima-assist: WebGL2 via Emscripten
++#elif defined(__APPLE__)
+ #include <OpenGL/gl.h>
+ #elif defined(__ANDROID__)
+ #include <GLES3/gl31.h>
+diff --git a/src/screen_glfw.cpp b/src/screen_glfw.cpp
+index a8d7a6a..e511ed0 100644
+--- a/src/screen_glfw.cpp
++++ b/src/screen_glfw.cpp
+@@ -18,6 +18,9 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <GLFW/glfw3.h>
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ 
+ #define MAX_CURSORS 4
+ 
+@@ -303,6 +306,73 @@ static void scrollHandler(GLFWwindow* win, double x, double y)
+     dispatchEvent(&ie);
+ }
+ 
++#ifdef __EMSCRIPTEN__
++/*
++ * ultima-assist: Under Emscripten the GLFW callbacks run from the browser's
++ * event loop, not from inside glfwPollEvents().  xu4's handlers can start
++ * nested blocking loops (e.g. IntroController::initiateNewGame), which call
++ * emscripten_sleep(); doing that from a callback while main() is already
++ * suspended by Asyncify corrupts memory.  So the callbacks only queue the
++ * event, and handleInputEvents() replays the queue on the main stack.
++ */
++struct QueuedEvent {
++    int type;       // 0 key, 1 mouse move, 2 mouse button, 3 scroll
++    int a, b, c, d;
++    double x, y;
++};
++
++#define EVQ_SIZE 256
++static QueuedEvent evQueue[EVQ_SIZE];
++static int evHead, evTail;
++
++static void queueEvent(const QueuedEvent& e)
++{
++    int next = (evHead + 1) % EVQ_SIZE;
++    if (next == evTail)
++        return;     // Full: drop.
++    evQueue[evHead] = e;
++    evHead = next;
++}
++
++static void keyQueue(GLFWwindow*, int token, int scancode, int action, int mods)
++{
++    QueuedEvent e = {0, token, scancode, action, mods, 0.0, 0.0};
++    queueEvent(e);
++}
++
++static void mouseMotionQueue(GLFWwindow*, double x, double y)
++{
++    QueuedEvent e = {1, 0, 0, 0, 0, x, y};
++    queueEvent(e);
++}
++
++static void mouseButtonQueue(GLFWwindow*, int button, int action, int mods)
++{
++    QueuedEvent e = {2, button, action, mods, 0, 0.0, 0.0};
++    queueEvent(e);
++}
++
++static void scrollQueue(GLFWwindow*, double x, double y)
++{
++    QueuedEvent e = {3, 0, 0, 0, 0, x, y};
++    queueEvent(e);
++}
++
++static void flushQueuedEvents(GLFWwindow* win)
++{
++    while (evTail != evHead) {
++        QueuedEvent e = evQueue[evTail];
++        evTail = (evTail + 1) % EVQ_SIZE;
++        switch (e.type) {
++            case 0: keyHandler(win, e.a, e.b, e.c, e.d); break;
++            case 1: mouseMotionHandler(win, e.x, e.y); break;
++            case 2: mouseButtonHandler(win, e.a, e.b, e.c); break;
++            case 3: scrollHandler(win, e.x, e.y); break;
++        }
++    }
++}
++#endif
++
+ extern int screenInitState(ScreenState*, const Settings*, int dw, int dh);
+ 
+ void screenInit_sys(const Settings* settings, ScreenState* state, int reset)
+@@ -384,10 +454,17 @@ void screenInit_sys(const Settings* settings, ScreenState* state, int reset)
+             errorFatal("Unable to create GLFW window");
+         }
+ 
++#ifdef __EMSCRIPTEN__
++        glfwSetKeyCallback(ss->view, keyQueue);
++        glfwSetCursorPosCallback(ss->view, mouseMotionQueue);
++        glfwSetMouseButtonCallback(ss->view, mouseButtonQueue);
++        glfwSetScrollCallback(ss->view, scrollQueue);
++#else
+         glfwSetKeyCallback(ss->view, keyHandler);
+         glfwSetCursorPosCallback(ss->view, mouseMotionHandler);
+         glfwSetMouseButtonCallback(ss->view, mouseButtonHandler);
+         glfwSetScrollCallback(ss->view, scrollHandler);
++#endif
+ 
+ #if defined(__linux__)
+         _setWindowIcon(ss->view, "/usr/share/icons/hicolor/48x48/apps/xu4.png");
+@@ -597,6 +674,11 @@ void EventHandler::handleInputEvents(Controller* waitCon,
+ #endif
+ 
+     glfwPollEvents();
++#ifdef __EMSCRIPTEN__
++    // ultima-assist: let the browser run (input, painting); needs -sASYNCIFY.
++    emscripten_sleep(1);
++    flushQueuedEvents(ss->view);
++#endif
+ 
+     ss->waitCon = prevCon;
+     ss->update  = prevUpdate;
+diff --git a/src/screen_sdl.cpp b/src/screen_sdl.cpp
+index f43a161..0b0701b 100644
+--- a/src/screen_sdl.cpp
++++ b/src/screen_sdl.cpp
+@@ -70,7 +70,7 @@ void screenInit_sys(const Settings* settings, ScreenState* state, int reset) {
+ 
+     {
+     char buf[MOD_NAME_LIMIT];
+-    SDL_WM_SetCaption(settings->gameTitle(buf), NULL);
++    SDL_WM_SetCaption(xu4.config->gameTitle(buf), NULL);
+     }
+ 
+     SDL_SetGamma(settings->gamma / 100.0f, settings->gamma / 100.0f, settings->gamma / 100.0f);
+diff --git a/src/settings.cpp b/src/settings.cpp
+index 086bd13..e49dede 100644
+--- a/src/settings.cpp
++++ b/src/settings.cpp
+@@ -101,6 +101,9 @@ void Settings::init(const char* profileName) {
+                 userPath += "/";
+             }
+         }
++#elif defined(__EMSCRIPTEN__)
++        // ultima-assist: web/shell.html mounts browser storage (IDBFS) here.
++        userPath = "/xu4home/";
+ #elif defined(__unix__)
+         char *home = getenv("HOME");
+         if (home && home[0]) {
+diff --git a/src/support/getTicks.c b/src/support/getTicks.c
+index e78bd3c..b8a5e85 100644
+--- a/src/support/getTicks.c
++++ b/src/support/getTicks.c
+@@ -2,6 +2,9 @@
+  * getTicks - A cross platform timer function.
+  */
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ #ifdef _WIN32
+ #include <sys/types.h>
+ #include <sys/timeb.h>
+@@ -42,7 +45,10 @@ uint32_t getTicks()
+ 
+ void msecSleep(uint32_t ms)
+ {
+-#ifdef _WIN32
++#ifdef __EMSCRIPTEN__
++    // ultima-assist: yield to the browser (needs -sASYNCIFY).
++    emscripten_sleep(ms);
++#elif defined(_WIN32)
+     Sleep(ms);
+ #else
+    struct timespec stime;

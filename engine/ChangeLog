@@ -1,0 +1,212 @@
+		XU4 Change Log
+
+v1.4.3 - 2025-05-16
+  - Support 4:3 display aspect with point-43 and xBRZ-43 scaling filters.
+  - Fix control key sequences on Windows.
+  - Fix crash with GLFW backend when cursor key is held when exiting combat.
+  - Fix sound intialization on Windows Vista.
+  - Another attempt to fix choppy audio on Windows.
+
+v1.4.2 - 2025-01-04
+  - Fix flashing garbage in fullscreen borders.
+  - Update Faun to try fixing choppy audio on Windows.
+
+v1.4.1 - 2024-12-18
+  - Update license to GPL-3.0-or-later.
+  - Added GLFW 3 backend which is now used on Windows.
+  - Show title bar icon on Windows.
+  - Karma adjustments from buying reagents match DOS version.
+  - Allow periods in module filenames.
+  - A few minor code fixes.
+
+v1.4 - 2023-10-27
+  - Support unique spell effect sounds & spoken casting incantations.
+  - Improved game browser UI.  The soundtrack can be changed without a reset.
+  - Reset dungeons on exit to world.
+  - Poison & sleep effects are applied more like the original game.
+  - Play sounds & flash player stats for more damage effects.
+  - Added sounds for mixture fizzle & torch ignite.
+  - Added xBRZ scaling filter.
+  - Fixed a few bugs.
+
+v1.3 - 2023-06-24
+  - Support NPC voice streams (provided by a new U4-Recreated module).
+  - Game can now be paused with Alt-P & Pause keys.
+  - Update Faun for latest Linux changes.
+  - Support Raspberry Pi 4 Model B.
+  - Some tweaks and fixes.
+
+v1.2 - 2022-12-06
+  - Fixed loading of gypsy card & dungeon images from the U4-Upgrade module.
+  - Flash player stats for poison, starvation, and ship damage.
+  - Play sounds for spell failure, starvation, and land-based storms.
+  - Fullscreen mode automatically chooses the scaling factor.
+  - Fixed --help & --verbose output on Windows with Command Prompt.
+  - Cities can now be defined using TMX maps without limits on size or number
+    of people.  Dialogue can be created without keyword limits.
+  - Added GLV backend for Linux & Android.  On Linux this saves 0.9 MiB of RAM.
+    The Android port runs but is unplayable as there are no touch controls.
+
+v1.1 - 2022-07-13
+  - Implemented game module layering.
+    * A game browser can be opened using the Escape key.
+    * The VGA upgrade is now selected by running the U4-Upgrade module.
+    * Separate soundtrack modules can be selected.
+  - Added Faun sound backend and support sfxr (rFX) sounds.
+  - Support spoken dialogue for the gypsy, Lord British & Hawkwind.
+  - Play sounds for ship cannons, storms, whirlpools, ranged attacks and
+    party damage.
+  - Fixed ship to stay afloat when the hull is at zero.
+  - Fixed pirate ships to not turn repeatedly in place.
+  - Fixed companions to not appear in towns after joining the party.
+  - Fixed crash bug when entering combat.
+
+v1.0 - 2022-03-08
+  - Added pauses during card casting.
+  - Tweaked death sequence to match DOS version.
+  - Animated codex opening during end game.
+  - Fixed VGA codex graphics.
+  - Rewrote the dialogue system for non-vendor NPCs.
+  - Enabled music looping in Allegro backend.
+  - Added audio cues for invalid keys & bad commands.
+  - Settings file allows line comments.
+  - Fixed a few bugs.
+
+v1.0beta5 - 2022-01-06
+  - Allegro 5 is now used as the cross-platform middleware.
+  - OpenGL is now used for scaling and filtering.
+  - Aspect ratio is preserved in fullscreen mode.
+  - Game data is now stored in a single file package.
+  - Replaced XML configuration and scripts with Boron.
+  - Replaced Impulse Tracker music with Ogg Vorbis streams.
+  - Dungeon state is now preserved after a save/load cycle.
+  - Implemented trap detection in dungeons.
+  - Added trap sounds & shaking.
+  - Frame animations now play forward independently for each creature.
+  - Increased creature damage to match the PC version.
+  - Fixed horse gallop animation, sound, & message.
+  - Fixed fire phantom to cycle colors and not move onto other creatures.
+  - Fixed a few message window formatting and timing issues.
+  - Subtitle animation more closely matches the original.
+  - Moongate animates during introduction.
+  - New character creation graphics for VGA mode.
+  - CLI options are more constrained.
+  - CLI --quiet option completely disables audio output.
+  - Added input recording & playback for developers.
+  - Overhauled codebase fixes many memory leaks, compiler errors, and
+    optimizes memory use.
+
+v1.0beta4 - 2011-01-25
+ - many bug fixes
+ - text colorization
+ - enchanced line-of-sight algorithm
+ - more sound effects
+ - support for multiple profiles/saved games
+ - the traditional title sequence was implemented
+ - tracker-based music files have been generated to replace the midi
+ - spell/combat animations and sound effect timings have been tweaked
+ - dungeon rendering improved
+ - tile stacks and effects display transparencies
+
+v1.0beta3 - 2005-10-06
+ - more bug fixes
+ - stability improvements
+ - lots more changes under the hood
+
+v1.0beta1 - 2004-11-29
+ - lots of fixes for dungeons and combat
+ - now fully playable from start to finish
+ - stability improvements
+ - lots of changes under the hood: xu4 is now written in C++, new
+   vendor scripting system
+
+New in v0.9
+ - dungeon altars and codex sequence (the game is now completeable)
+ - added context-sensitive default action to "Enter" key
+ - completed first person dungeon view
+ - sounds effects
+ - a few crasher bugs from 0.8 are now fixed
+ - as usual, lots of bugs fixes and code reorganization
+
+New in v0.8
+ - dungeon rooms
+ - first person view in dungeons
+ - improved config menus
+ - config menu navigation with arrow keys
+ - can now switch between VGA/EGA versions of the game
+ - ranged monster attacks
+ - implemented hole up & camp command
+ - implemented inn ghost
+ - xu4 can now load the Ultima IV data files straight out of
+   ultima4.zip and u4upgrad.zip
+ - all music can be previewed at the intro screen with the number keys
+ - many spells now work: awaken, blink, cure, dispel, gate, heal,
+   light, negate, tremor, resurrect, xit
+ - The bell, book, candle and skull now work
+ - better error reporting under MacOS X
+ - bug fixes galore
+ - lots of code cleanup
+
+New in v0.7
+ - ranged combat
+ - long responses now pause before scrolling off screen
+ - the telescope in the Lycaeum now works
+ - the silver horn now works
+ - monsters now initiate combat
+ - wind now influences ship movement
+ - fields, lava and poison now work in combat
+ - added player highlighting in stats display during combat
+ - added options to filter move messages and automatically open doors
+ - certain people now "turn away" in conversations
+ - lots more bugs squashed
+
+New in v0.6
+ - many bug fixes
+ - lots of code reorganization
+ - better pathfinding code
+ - all vendors, healers, taverns and inns now work
+
+New in v0.5
+ - lots of combat refinements, random monsters
+ - lots of fixes to vendor code (weapon, armor and food fully
+   implemented)
+ - Lord British nows heals party when asked about health
+ - "Mix Reagents" command works
+ - the "Yell" command now controls horse speed
+ - lots of the game mechanics that were guessed before now match the
+   original Ultima IV
+ - two new utility programs are provided for encoding and decoding the
+   graphics files used in the introduction (lzwenc & lzwdec)
+ - the usual bug fixes
+
+New in v0.09:
+ - first go at combat; still need to figure out true U4
+   combat algorithms
+ - food vendors now work and buggy weapons/armor vendors are fixed
+ - AdvanceMAME scaler (now the default), handles x2, x3, x4
+ - configuration menu at startup, settings saved in .xu4rc file
+ - drops frames when needed to better handle slow computers or X displays
+ - lots of code cleanup and bug fixes
+
+New in v0.08:
+ - 2xSaI scaler (now the default)
+ - fullscreen mode (-f on the command line)
+ - skip intro mode (-i on the command line)
+ - shrines and meditation, more actions affect karma
+ - sleep fields and poison now work
+ - if the party dies, they are now resurrected by Lord British
+ - spell casting improvements: Awaken, Cure, Heal, Dispel, Resurrect work
+
+New in v0.07:
+ - items searchable (runes, white & black stones, bell, book, candle,
+   etc.)
+ - city residents now move and have animated tiles
+ - gem viewing (tiles aren't quite right)
+ - getting chests
+ - some actions now affect your virtues (stealing chests, talking to
+   hawkwind, finding runes and stones)
+ - companions will now join the party if asked
+ - added filtering to the scaled images, like exult (2xBilinear only,
+   for now); the -scale parameter now accepts a number or "2xBi" for
+   filtered scaling (2 is still the default, 2xBi looks bad without
+   the VGA upgrade)

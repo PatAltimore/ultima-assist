@@ -1,0 +1,11 @@
+tools/emsdk/
+tools/emsdk-install.log
+/build/
+/build-dbg/
+/dist/
+deps/out/
+deps/boron/config.opt
+deps/boron/project.config
+engine/Ultima-IV.mod
+engine/render.pak
+*.zip

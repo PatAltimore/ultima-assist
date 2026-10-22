@@ -1,0 +1,8 @@
+# Keep shell scripts and sources LF so the Linux CI build works from a Windows checkout.
+* text=auto eol=lf
+*.png binary
+*.mod binary
+*.pak binary
+*.ogg binary
+*.zip binary
+*.exe binary

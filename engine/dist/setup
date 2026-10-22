@@ -1,0 +1,34 @@
+#!/bin/sh
+# XU4 Linux Installer
+
+PREFIX=/usr
+SHARE=$PREFIX/share
+
+case $1 in
+install)
+	sudo install -D -m 755 xu4 $PREFIX/bin/xu4
+	sudo install -D -m 644 render.pak $SHARE/xu4/render.pak
+	sudo install -m 644 Ultima-IV.mod U4-Upgrade.mod $SHARE/xu4
+	sudo install -D -m 644 desktop/xu4.png $SHARE/icons/hicolor/48x48/apps/xu4.png
+	sudo install -D -m 644 desktop/xu4.desktop $SHARE/applications/xu4.desktop
+	;;
+
+uninstall)
+	sudo rm -f $PREFIX/bin/xu4
+	sudo rm -f $SHARE/xu4/render.pak $SHARE/xu4/Ultima-IV.mod $SHARE/xu4/U4-Upgrade.mod
+	sudo rm -f $SHARE/icons/hicolor/48x48/apps/xu4.png $SHARE/applications/xu4.desktop
+	;;
+
+*)
+	echo "Usage: $0 [install | uninstall]"
+	echo
+	echo "Actions:"
+	echo "  install     Install program files to system directories"
+	echo "  uninstall   Remove previously installed files."
+	echo
+	echo "Note that the program can be run from this directory - installation is optional."
+	echo
+	echo "You will need Ultima IV for DOS, it is not included here."
+	echo "See http://xu4.sourceforge.net/faq.html for more information."
+	;;
+esac

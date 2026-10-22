@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultima Assist</title>
+<style>
+  :root { color-scheme: dark; --panel: #1a1a1a; --line: #333; --dim: #9a9a9a; --good: #5fbf5f; --warn: #e0b040; --bad: #e06060; }
+  html, body { margin: 0; min-height: 100%; background: #101010; color: #e0e0e0;
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: #8cbeff; }
+  code { background: #262626; padding: 0 .25em; border-radius: 3px; }
+  #app { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 12px; padding: 8px; box-sizing: border-box; }
+  #stage { flex: 1 1 560px; max-width: 1000px; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  canvas#canvas { display: none; background: #000; border: 0; outline: none; image-rendering: pixelated;
+    width: min(100%, calc((100vh - 16px) * 1.6)) !important; height: auto !important; aspect-ratio: 8 / 5; }
+  #status { min-height: 1.5em; color: var(--dim); text-align: center; padding: 0 16px; }
+  #loader { display: none; max-width: 36em; padding: 8vh 16px 0; text-align: center; }
+  #loader h1 { font-size: 1.4em; margin: 0 0 .3em; }
+  #drop { border: 2px dashed #606060; border-radius: 8px; padding: 1.5em 1em; margin: 1em 0; }
+  #drop.over { border-color: #fff; background: #303030; }
+  button { font: inherit; padding: .3em .8em; cursor: pointer; }
+  .err { color: #ff8080; min-height: 1.5em; }
+  .small { font-size: .85em; color: var(--dim); }
+  #legal { text-align: center; padding: 12px 16px 56px; }
+  #forget { position: fixed; right: 8px; bottom: 8px; opacity: .5; display: none; }
+  #forget:hover { opacity: 1; }
+
+  /* Assist sidebar */
+  #assist { display: none; flex: 0 0 340px; max-width: 100%; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; box-sizing: border-box; max-height: calc(100vh - 16px); overflow-y: auto; }
+  #assist h2 { font-size: .8em; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 14px 0 6px; }
+  #assist h2:first-child { margin-top: 0; }
+  .row { display: flex; justify-content: space-between; gap: 8px; }
+  .row .k { color: var(--dim); }
+  .member { margin-bottom: 8px; }
+  .member .nm { display: flex; justify-content: space-between; }
+  .bar { height: 7px; background: #2a2a2a; border-radius: 4px; overflow: hidden; margin: 2px 0; }
+  .bar > i { display: block; height: 100%; background: var(--good); }
+  .bar.low > i { background: var(--warn); } .bar.crit > i { background: var(--bad); }
+  .stats { color: var(--dim); font-size: .85em; }
+  .virtue { display: grid; grid-template-columns: 5.6em 1fr 2.6em; gap: 6px; align-items: center; }
+  .virtue .bar { margin: 0; } .virtue .bar > i { background: #6aa0e0; }
+  .virtue.done .bar > i { background: var(--good); }
+  .virtue .v { text-align: right; font-variant-numeric: tabular-nums; }
+  .vhint { grid-column: 1 / -1; font-size: .8em; color: var(--dim); margin: -2px 0 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { padding: 0 .5em; border: 1px solid var(--line); border-radius: 10px; font-size: .8em; color: #666; }
+  .chip.on { color: #e0e0e0; border-color: #6a6a6a; background: #262626; }
+  .hint { background: #222; border-left: 3px solid var(--warn); padding: 4px 8px; margin: 4px 0; font-size: .9em; }
+  .next { background: #1d2430; border-left: 3px solid #6aa0e0; padding: 4px 8px; margin: 4px 0; font-size: .9em; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  #waiting { color: var(--dim); }
+  details { margin: 4px 0; }
+  details > summary { cursor: pointer; color: #cfcfcf; }
+  .check { list-style: none; margin: 4px 0 0; padding: 0; font-size: .9em; }
+  .check li { padding-left: 1.4em; position: relative; margin: 2px 0; }
+  .check li::before { content: "\25CB"; position: absolute; left: 0; color: var(--dim); }
+  .check li.done { color: var(--dim); }
+  .check li.done::before { content: "\2713"; color: var(--good); }
+  .town { background: #202020; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: .9em; }
+  .town b.t { font-size: 1.05em; }
+  .town ul { margin: 4px 0 0; padding-left: 1.2em; }
+  canvas#automap { width: 100%; aspect-ratio: 1; image-rendering: pixelated; background: #0c0c0c; border: 1px solid var(--line); border-radius: 4px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: .78em; color: var(--dim); margin-top: 4px; }
+  .legend i { display: inline-block; width: 8px; height: 8px; margin-right: 3px; vertical-align: -1px; }
+  @media (max-width: 900px) { #assist { flex: 1 1 100%; max-height: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="status">Loading engine&hellip;</div>
+    <div id="loader">
+      <h1>Ultima IV game data needed</h1>
+      <p>This page doesn't include the original game data. Pick your own
+         <code>ultima4.zip</code> (the DOS version of Ultima IV, which Origin released as freeware).
+         It stays in this browser's storage &mdash; nothing is uploaded anywhere.</p>
+      <div id="drop">
+        <p>Drop <code>ultima4.zip</code> here, or</p>
+        <button id="pick" type="button">Choose ultima4.zip&hellip;</button>
+        <input id="zipInput" type="file" accept=".zip" hidden>
+      </div>
+      <div class="err" id="loaderErr"></div>
+      <p class="small">You don't need to unzip it. The <a href="https://xu4.sourceforge.net/" target="_blank" rel="noopener noreferrer">xu4 project</a>
+         links to a download of the DOS version.</p>
+    </div>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  </div>
+
+  <aside id="assist" aria-label="Assist mode">
+    <div id="waiting">Assist mode starts once you begin or load a game.</div>
+    <div id="live" hidden>
+      <h2>Where you are</h2>
+      <div id="loc"></div>
+      <div id="townbox"></div>
+      <h2>Party</h2>
+      <div id="party"></div>
+      <h2>Supplies</h2>
+      <div id="supplies"></div>
+      <h2>Hints</h2>
+      <div id="hints"></div>
+      <h2>Quest</h2>
+      <div id="steps"></div>
+      <div id="checklist"></div>
+      <h2>Map</h2>
+      <canvas id="automap" width="256" height="256"></canvas>
+      <div class="legend">
+        <span><i style="background:#e0c040"></i>Town</span><span><i style="background:#e06060"></i>Dungeon</span>
+        <span><i style="background:#50d0e0"></i>Shrine</span><span><i style="background:#c080e0"></i>Moongate</span>
+        <span><i style="background:#fff"></i>You</span>
+      </div>
+      <label class="small"><input type="checkbox" id="showAll"> Show the whole map (spoilers)</label>
+      <h2>Virtues</h2>
+      <div id="virtues"></div>
+      <h2>Quest items</h2>
+      <div id="quest"></div>
+      <h2>Assist</h2>
+      <div class="actions">
+        <button type="button" data-act="heal">Heal party</button>
+        <button type="button" data-act="food">+10 food</button>
+        <button type="button" data-act="gold">+500 gold</button>
+      </div>
+      <p class="small">Changes show on the game screen after your next move.
+         Locations come from the game's own map data.</p>
+    </div>
+  </aside>
+</div>
+<footer id="legal" class="small">
+  Unofficial, open-source browser build of <a href="https://github.com/xu4-engine/u4" target="_blank" rel="noopener noreferrer">xu4</a> (GPL-3.0).
+  Not affiliated with EA or Origin. No game data is included.
+  <a href="NOTICE.txt">Source and licences</a>
+</footer>
+<button id="forget" type="button" title="Remove the stored game data and saves from this browser">Forget game data</button>
+
+<script src="guide-data.js"></script>
+<script>
+  var statusEl = document.getElementById('status');
+  var canvasEl = document.getElementById('canvas');
+
+  var Module = {
+    noInitialRun: true,
+    canvas: canvasEl,
+    print: function(t) { console.log(t); },
+    printErr: function(t) { console.warn(t); },
+    setStatus: function(t) { statusEl.textContent = t || ''; },
+    onRuntimeInitialized: function() { Ultima.boot(); }
+  };
+
+  // The zip lives in its own IDBFS mount (/zipstore) and is symlinked to
+  // /ultima4.zip, where xu4 looks.  The engine's saves and settings go to
+  // /xu4home, a second IDBFS mount (see Settings::init in settings.cpp).
+  var Ultima = {
+    ZIP_DIR: '/zipstore', HOME_DIR: '/xu4home', ZIP_NAME: 'ultima4.zip',
+    started: false, syncing: false, syncAgain: false,
+    el: function(id) { return document.getElementById(id); },
+    hasZip: function() { return FS.analyzePath(this.ZIP_DIR + '/' + this.ZIP_NAME).exists; },
+    mount: function(dir) { try { FS.mkdir(dir); } catch (e) {} FS.mount(IDBFS, {}, dir); },
+    boot: function() {
+      var self = this;
+      // A build with the zip embedded (local testing) skips the prompt.
+      if (FS.analyzePath('/ultima4.zip').exists) {
+        this.mount(this.HOME_DIR);
+        FS.syncfs(true, function() { self.start(); });
+        return;
+      }
+      this.mount(this.ZIP_DIR);
+      this.mount(this.HOME_DIR);
+      FS.syncfs(true, function(err) {
+        if (err) console.warn('Failed to load stored data: ' + err);
+        if (self.hasZip()) self.start(); else self.showLoader();
+      });
+      var input = this.el('zipInput'), drop = this.el('drop');
+      this.el('pick').onclick = function() { input.click(); };
+      input.onchange = function() { if (input.files.length) self.addFile(input.files[0]); input.value = ''; };
+      drop.ondragover = function(e) { e.preventDefault(); drop.classList.add('over'); };
+      drop.ondragleave = function() { drop.classList.remove('over'); };
+      drop.ondrop = function(e) {
+        e.preventDefault(); drop.classList.remove('over');
+        if (e.dataTransfer.files.length) self.addFile(e.dataTransfer.files[0]);
+      };
+      this.el('forget').onclick = function() {
+        if (!confirm('Remove the stored game data, saved games and map progress from this browser, and reload?')) return;
+        self.wipe(self.ZIP_DIR); self.wipe(self.HOME_DIR);
+        try { localStorage.removeItem(Assist.STORE_KEY); } catch (e) {}
+        FS.syncfs(false, function() { location.reload(); });
+      };
+    },
+    wipe: function(dir) {
+      var self = this;
+      FS.readdir(dir).forEach(function(n) {
+        if (n === '.' || n === '..') return;
+        var p = dir + '/' + n, st = FS.stat(p);
+        if (FS.isDir(st.mode)) { self.wipe(p); FS.rmdir(p); } else FS.unlink(p);
+      });
+    },
+    showLoader: function() {
+      Module.setStatus('');
+      this.el('loader').style.display = 'block';
+    },
+    setError: function(m) { this.el('loaderErr').textContent = m; },
+    addFile: async function(f) {
+      this.setError('');
+      var bytes = new Uint8Array(await f.arrayBuffer());
+      if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4B) {
+        this.setError('"' + f.name + '" is not a zip file.');
+        return;
+      }
+      // File names are stored uncompressed in a zip's directory.
+      var text = new TextDecoder('latin1').decode(bytes).toUpperCase();
+      if (text.indexOf('AVATAR.EXE') < 0) {
+        this.setError("That zip doesn't look like the DOS version of Ultima IV (no AVATAR.EXE inside).");
+        return;
+      }
+      var self = this;
+      FS.writeFile(this.ZIP_DIR + '/' + this.ZIP_NAME, bytes);
+      FS.syncfs(false, function(err) {
+        if (err) console.warn('Failed to store game data: ' + err);
+        self.start();
+      });
+    },
+    // Write IDBFS to the browser; coalesce overlapping requests.
+    sync: function() {
+      var self = this;
+      if (this.syncing) { this.syncAgain = true; return; }
+      this.syncing = true;
+      FS.syncfs(false, function(err) {
+        if (err) console.warn('Failed to save: ' + err);
+        self.syncing = false;
+        if (self.syncAgain) { self.syncAgain = false; self.sync(); }
+      });
+    },
+    start: function() {
+      if (this.started) return;
+      this.started = true;
+      this.el('loader').style.display = 'none';
+      Module.setStatus('');
+      canvasEl.style.display = 'block';
+      this.el('assist').style.display = 'block';
+      if (this.hasZip()) {
+        this.el('forget').style.display = 'block';
+        try { FS.unlink('/ultima4.zip'); } catch (e) {}
+        FS.symlink(this.ZIP_DIR + '/' + this.ZIP_NAME, '/ultima4.zip');
+      }
+      var self = this;
+      setInterval(function() { self.sync(); }, 5000);
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') { self.sync(); Assist.save(); }
+      });
+      window.addEventListener('pagehide', function() { self.sync(); Assist.save(); });
+      Assist.init();
+      canvasEl.focus();
+      Module.callMain([]);
+    }
+  };
+
+  // Assist sidebar: polls the engine's assist_* exports (engine/src/assist.cpp)
+  // and combines them with GUIDE (web/guide-data.js, generated from the game's
+  // own maps.b) for town guides, the quest checklist and the automap.
+  var Assist = {
+    STORE_KEY: 'ultima-assist.automap.v1',
+    VIRTUES: [
+      // name, mantra
+      ['Honesty', 'AHM'], ['Compassion', 'MU'], ['Valor', 'RA'], ['Justice', 'BEH'],
+      ['Sacrifice', 'CAH'], ['Honor', 'SUMM'], ['Spirituality', 'OM'], ['Humility', 'LUM']
+    ],
+    CLASSES: ['Mage', 'Bard', 'Fighter', 'Druid', 'Tinker', 'Paladin', 'Ranger', 'Shepherd'],
+    WIND: ['', 'West', 'North', 'East', 'South'],
+    MOON: ['New', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full', 'Waning gibbous', 'Last quarter', 'Waning crescent'],
+    MAPTYPE: ['Overworld', 'Town or castle', 'Shrine', 'Battle', 'Dungeon'],
+    REAGENTS: ['Sulfur ash', 'Ginseng', 'Garlic', 'Spider silk', 'Blood moss', 'Black pearl', 'Nightshade', 'Mandrake'],
+    ITEMS: [[0x01, 'Skull of Mondain'], [0x04, 'Candle of Love'], [0x08, 'Book of Truth'], [0x10, 'Bell of Courage'],
+            [0x20, 'Key of Courage'], [0x40, 'Key of Love'], [0x80, 'Key of Truth'], [0x100, 'Silver Horn'], [0x200, 'Wheel of the HMS Cape']],
+    STONES: [[1, 'Blue'], [2, 'Yellow'], [4, 'Red'], [8, 'Green'], [16, 'Orange'], [32, 'Purple'], [64, 'White'], [128, 'Black']],
+    ROLES: {
+      healer: 'Healer', innkeeper: 'Inn', foodvendor: 'Food', reagentsvendor: 'Reagents', weaponsvendor: 'Weapons',
+      armorvendor: 'Armor', tavernkeeper: 'Tavern', guildvendor: 'Guild goods', horsevendor: 'Horses',
+      companion: 'A companion you can recruit', lordbritish: 'Lord British', hawkwind: 'Hawkwind the seer'
+    },
+    TERRAIN: [[95,95,95], [31,63,143], [63,95,63], [63,143,63], [111,159,79], [31,95,31], [143,127,79], [143,143,143], [160,110,60], [143,111,63]],
+    last: '',
+    seen: new Uint8Array(65536), terrain: null, visited: {}, lastWorld: null,
+    dirtyStore: false, mapDirty: true, showAll: false, markers: [],
+
+    el: function(id) { return document.getElementById(id); },
+    ex: function(n) { return Module['_assist_' + n]; },
+    call: function(n, a, b) { var f = this.ex(n); return f ? f(a, b) : 0; },
+    str: function(ptr) { return ptr ? Module.UTF8ToString(ptr) : ''; },
+    esc: function(s) { return String(s).replace(/[&<>"]/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); },
+
+    init: function() {
+      var self = this;
+      document.querySelectorAll('#assist [data-act]').forEach(function(b) {
+        b.onclick = function() {
+          var a = b.getAttribute('data-act');
+          if (a === 'heal') self.call('heal_party');
+          else if (a === 'food') self.call('add_food', 10);
+          else if (a === 'gold') self.call('add_gold', 500);
+          self.last = '';
+          canvasEl.focus();
+        };
+      });
+      this.buildMarkers();
+      this.load();
+      var all = this.el('showAll');
+      all.onchange = function() { self.showAll = all.checked; self.mapDirty = true; self.last = ''; };
+      var cv = this.el('automap');
+      cv.onmousemove = function(e) { cv.title = self.markerAt(e); };
+      setInterval(function() { self.poll(); }, 400);
+      setInterval(function() { self.save(); }, 5000);
+    },
+
+    // ----- data helpers (from GUIDE) -----
+    townName: function(t) { return (t.name === 'Britannia' && t.kind === 'castle') ? "Lord British's Castle" : t.name; },
+    findLabel: function(key) {
+      var G = GUIDE, id, i, L;
+      for (id in G.towns) { L = G.towns[id].labels; for (i = 0; i < L.length; i++) if (L[i].k === key) return {where: this.townName(G.towns[id]), x: L[i].x, y: L[i].y, mapId: +id}; }
+      for (id in G.dungeons) { L = G.dungeons[id].labels; for (i = 0; i < L.length; i++) if (L[i].k === key) return {where: G.dungeons[id].name, dungeon: true, wx: G.dungeons[id].wx, wy: G.dungeons[id].wy}; }
+      L = G.world.labels; for (i = 0; i < L.length; i++) if (L[i].k === key) return {where: 'Overworld', x: L[i].x, y: L[i].y, world: true};
+      return null;
+    },
+    at: function(p) { return p ? '(' + p.x + ', ' + p.y + ')' : ''; },
+    shrineFor: function(v) {
+      for (var id in GUIDE.shrines) if (GUIDE.shrines[id].virtue === this.VIRTUES[v][0]) return GUIDE.shrines[id];
+      return null;
+    },
+    direction: function(dx, dy) {
+      var p = [];
+      if (dy) p.push(Math.abs(dy) + (dy < 0 ? ' north' : ' south'));
+      if (dx) p.push(Math.abs(dx) + (dx < 0 ? ' west' : ' east'));
+      return p.length ? p.join(', ') : 'right here';
+    },
+
+    // ----- automap -----
+    buildMarkers: function() {
+      var G = GUIDE, m = [], id;
+      for (id in G.towns) { var t = G.towns[id]; if (t.wx !== undefined && id !== '56') m.push({kind: 'town', id: +id, x: t.wx, y: t.wy, name: this.townName(t)}); }
+      for (id in G.dungeons) { var d = G.dungeons[id]; if (d.wx !== undefined) m.push({kind: 'dungeon', id: +id, x: d.wx, y: d.wy, name: d.name}); }
+      for (id in G.shrines) { var s = G.shrines[id]; if (s.wx !== undefined) m.push({kind: 'shrine', id: +id, x: s.wx, y: s.wy, name: 'Shrine of ' + s.virtue}); }
+      G.world.moongates.forEach(function(g) { m.push({kind: 'moongate', id: -1, x: g.x, y: g.y, name: 'Moongate'}); });
+      this.markers = m;
+    },
+    isSeen: function(x, y) { return this.seen[(y & 255) * 256 + (x & 255)] === 1; },
+    markSeen: function(px, py) {
+      var R = 5, changed = false;
+      for (var dy = -R; dy <= R; dy++) for (var dx = -R; dx <= R; dx++) {
+        var i = ((py + dy) & 255) * 256 + ((px + dx) & 255);
+        if (!this.seen[i]) { this.seen[i] = 1; changed = true; }
+      }
+      if (changed) { this.dirtyStore = true; this.mapDirty = true; }
+    },
+    loadTerrain: function() {
+      var t = new Uint8Array(65536);
+      for (var y = 0; y < 256; y++) for (var x = 0; x < 256; x++) {
+        var k = this.call('world_tile', x, y);
+        t[y * 256 + x] = k < 0 ? 0 : k;
+      }
+      this.terrain = t;
+      this.mapDirty = true;
+    },
+    drawMap: function(S) {
+      var cv = this.el('automap'), ctx = cv.getContext('2d');
+      if (this.mapDirty && this.terrain) {
+        if (!this.base) { this.base = document.createElement('canvas'); this.base.width = this.base.height = 256; }
+        var bctx = this.base.getContext('2d'), img = bctx.createImageData(256, 256), d = img.data, i, c;
+        for (i = 0; i < 65536; i++) {
+          var seen = this.seen[i] === 1;
+          if (!seen && !this.showAll) { d[i*4] = 12; d[i*4+1] = 12; d[i*4+2] = 12; d[i*4+3] = 255; continue; }
+          c = this.TERRAIN[this.terrain[i]] || this.TERRAIN[0];
+          var f = seen ? 1 : 0.5;
+          d[i*4] = c[0] * f; d[i*4+1] = c[1] * f; d[i*4+2] = c[2] * f; d[i*4+3] = 255;
+        }
+        bctx.putImageData(img, 0, 0);
+        this.mapDirty = false;
+      }
+      ctx.fillStyle = '#0c0c0c'; ctx.fillRect(0, 0, 256, 256);
+      if (this.base) ctx.drawImage(this.base, 0, 0);
+      else { ctx.fillStyle = '#888'; ctx.font = '11px sans-serif'; ctx.fillText('Step onto the overworld to start the map.', 10, 128); }
+      var self = this, colors = {town: '#e0c040', dungeon: '#e06060', shrine: '#50d0e0', moongate: '#c080e0'};
+      this.markers.forEach(function(m) {
+        var vis = !!self.visited[m.id] && m.id >= 0, show = self.showAll || self.isSeen(m.x, m.y) || vis;
+        if (!show) return;
+        ctx.fillStyle = colors[m.kind]; ctx.strokeStyle = colors[m.kind];
+        var x = m.x, y = m.y;
+        if (m.kind === 'moongate') { ctx.fillRect(x - 1, y - 1, 3, 3); return; }
+        if (m.kind === 'town') { if (vis) ctx.fillRect(x - 2, y - 2, 5, 5); else ctx.strokeRect(x - 1.5, y - 1.5, 4, 4); }
+        else if (m.kind === 'dungeon') { ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x + 3, y + 2); ctx.lineTo(x - 3, y + 2); ctx.closePath(); if (vis) ctx.fill(); else ctx.stroke(); }
+        else { ctx.beginPath(); ctx.arc(x + .5, y + .5, 2.2, 0, 6.3); if (vis) ctx.fill(); else ctx.stroke(); }
+      });
+      var p = this.lastWorld;
+      if (p) {
+        ctx.fillStyle = '#000'; ctx.fillRect(p.x - 3, p.y - 3, 7, 7);
+        ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 2, p.y - 2, 5, 5);
+        ctx.fillStyle = '#e03030'; ctx.fillRect(p.x - 1, p.y - 1, 3, 3);
+      }
+    },
+    markerAt: function(e) {
+      var cv = this.el('automap'), r = cv.getBoundingClientRect();
+      var x = (e.clientX - r.left) * 256 / r.width, y = (e.clientY - r.top) * 256 / r.height, best = null, bd = 25;
+      var self = this;
+      this.markers.forEach(function(m) {
+        var vis = (self.visited[m.id] && m.id >= 0) || self.showAll || self.isSeen(m.x, m.y);
+        if (!vis) return;
+        var d = (m.x - x) * (m.x - x) + (m.y - y) * (m.y - y);
+        if (d < bd) { bd = d; best = m; }
+      });
+      return best ? best.name + ' (' + best.x + ', ' + best.y + ')' : 'x ' + Math.floor(x) + ', y ' + Math.floor(y);
+    },
+    load: function() {
+      try {
+        var raw = localStorage.getItem(this.STORE_KEY);
+        if (!raw) return;
+        var o = JSON.parse(raw), bin = atob(o.seen || ''), i, b;
+        for (i = 0; i < bin.length; i++) { b = bin.charCodeAt(i); for (var k = 0; k < 8; k++) if (b & (1 << k)) this.seen[i * 8 + k] = 1; }
+        this.visited = o.visited || {};
+        this.mapDirty = true;
+      } catch (e) {}
+    },
+    save: function() {
+      if (!this.dirtyStore) return;
+      try {
+        var bytes = '', i, k, b;
+        for (i = 0; i < 8192; i++) { b = 0; for (k = 0; k < 8; k++) if (this.seen[i * 8 + k]) b |= 1 << k; bytes += String.fromCharCode(b); }
+        localStorage.setItem(this.STORE_KEY, JSON.stringify({seen: btoa(bytes), visited: this.visited}));
+        this.dirtyStore = false;
+      } catch (e) {}
+    },
+
+    // ----- rendering helpers -----
+    bar: function(v, max) {
+      var pct = max > 0 ? Math.max(0, Math.min(100, v * 100 / max)) : 0;
+      return '<div class="bar' + (pct < 25 ? ' crit' : pct < 50 ? ' low' : '') + '"><i style="width:' + pct + '%"></i></div>';
+    },
+    chips: function(list, mask) {
+      var e = this.esc;
+      return '<div class="chips">' + list.map(function(x) {
+        return '<span class="chip' + ((mask & x[0]) ? ' on' : '') + '">' + e(x[1]) + '</span>';
+      }).join('') + '</div>';
+    },
+
+    poll: function() {
+      if (!this.ex('get_stage')) return;
+      var live = this.call('get_stage') === 1;
+      this.el('waiting').hidden = live;
+      this.el('live').hidden = !live;
+      if (!live) { this.last = ''; return; }
+
+      var c = this, S = {}, i;
+      S.name = c.str(c.call('loc_name')); S.type = c.call('loc_type'); S.mapId = c.call('loc_map_id');
+      S.x = c.call('loc_x'); S.y = c.call('loc_y'); S.z = c.call('loc_z');
+      S.wind = c.call('wind'); S.tram = c.call('trammel'); S.fel = c.call('felucca');
+      S.food = c.call('get_food'); S.gold = c.call('get_gold'); S.torches = c.call('get_torches');
+      S.gems = c.call('get_gems'); S.keys = c.call('get_keys'); S.sext = c.call('get_sextants'); S.moves = c.call('get_moves');
+      S.items = c.call('get_items'); S.stones = c.call('get_stones'); S.runes = c.call('get_runes');
+      S.reag = []; for (i = 0; i < 8; i++) S.reag.push(c.call('get_reagent', i));
+      S.virt = []; for (i = 0; i < 8; i++) S.virt.push(c.call('get_virtue', i));
+      S.party = [];
+      var n = c.call('party_size');
+      for (i = 0; i < n; i++) S.party.push({
+        name: c.str(c.call('member_name', i)), cls: c.call('member_class', i), hp: c.call('member_hp', i), hpMax: c.call('member_hp_max', i),
+        mp: c.call('member_mp', i), xp: c.call('member_xp', i), str: c.call('member_str', i), dex: c.call('member_dex', i),
+        intel: c.call('member_intel', i), status: String.fromCharCode(c.call('member_status', i))
+      });
+
+      // Automap bookkeeping.
+      if (S.type === 0) {
+        if (!this.terrain) this.loadTerrain();
+        this.lastWorld = {x: S.x, y: S.y};
+        this.markSeen(S.x, S.y);
+      }
+      if (GUIDE.towns[S.mapId] || GUIDE.dungeons[S.mapId] || GUIDE.shrines[S.mapId]) {
+        var vid = S.mapId === 56 ? 1 : S.mapId;
+        if (!this.visited[vid]) { this.visited[vid] = true; this.dirtyStore = true; }
+      }
+
+      var key = JSON.stringify(S) + '|' + (this.showAll ? 1 : 0) + '|' + (this.mapDirty ? 1 : 0);
+      if (key === this.last) return;
+      this.last = key;
+      this.render(S);
+    },
+
+    render: function(S) {
+      var self = this, e = this.esc, G = GUIDE;
+
+      var town = G.towns[S.mapId], dng = G.dungeons[S.mapId], shr = G.shrines[S.mapId];
+      var where = S.type === 0 ? 'Britannia' :
+        town ? e(this.townName(town)) : dng ? e(dng.name) : shr ? e('Shrine of ' + shr.virtue) :
+        e((S.name || 'Unknown').replace(/\.\w+$/, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function(m) { return m.toUpperCase(); }));
+      var coord = S.type === 4 ? ('Level ' + (S.z + 1) + ', ' + S.x + ', ' + S.y) : (S.x + ', ' + S.y);
+      this.el('loc').innerHTML =
+        '<div class="row"><b>' + where + '</b><span class="k">' + e(this.MAPTYPE[S.type] || '') + '</span></div>' +
+        '<div class="row"><span class="k">Position</span><span>' + coord + '</span></div>' +
+        '<div class="row"><span class="k">Wind</span><span>' + e(this.WIND[S.wind] || '-') + '</span></div>' +
+        '<div class="row"><span class="k">Trammel / Felucca</span><span>' + e(this.MOON[S.tram] || '-') + ' / ' + e(this.MOON[S.fel] || '-') + '</span></div>';
+
+      this.el('townbox').innerHTML = this.townGuide(S, town, dng, shr);
+
+      this.el('party').innerHTML = S.party.map(function(p) {
+        var dead = p.status === 'D', badge = p.status === 'G' ? '' : ' <b style="color:var(--bad)">' + ({P: 'Poisoned', S: 'Asleep', D: 'Dead'}[p.status] || p.status) + '</b>';
+        return '<div class="member"><div class="nm"><span><b>' + e(p.name) + '</b> <span class="k small">' + e(self.CLASSES[p.cls] || '') + '</span>' + badge + '</span>' +
+          '<span>' + p.hp + ' / ' + p.hpMax + '</span></div>' + (dead ? '' : self.bar(p.hp, p.hpMax)) +
+          '<div class="stats">MP ' + p.mp + ' &middot; XP ' + p.xp + ' &middot; STR ' + p.str + ' DEX ' + p.dex + ' INT ' + p.intel + '</div></div>';
+      }).join('');
+
+      var food = Math.floor(S.food / 100);
+      this.el('supplies').innerHTML =
+        '<div class="row"><span class="k">Food</span><span>' + food + '</span></div>' +
+        '<div class="row"><span class="k">Gold</span><span>' + S.gold + '</span></div>' +
+        '<div class="row"><span class="k">Torches / Gems / Keys</span><span>' + S.torches + ' / ' + S.gems + ' / ' + S.keys + '</span></div>' +
+        '<div class="row"><span class="k">Sextants</span><span>' + S.sext + '</span></div>' +
+        '<div class="row"><span class="k">Moves</span><span>' + S.moves + '</span></div>' +
+        '<div class="stats" style="margin-top:4px">' + this.REAGENTS.map(function(r, i) { return e(r) + ' ' + S.reag[i]; }).join(' &middot; ') + '</div>';
+
+      var hints = [];
+      if (food < 5) hints.push('Food is low (' + food + '). Buy some in a town before the party starves.');
+      var hurt = S.party.filter(function(p) { return p.status !== 'D' && p.hpMax && p.hp * 4 < p.hpMax; });
+      if (hurt.length) hints.push(hurt.map(function(p) { return p.name; }).join(', ') + ' badly hurt. Rest at an inn or find a healer.');
+      if (S.party.some(function(p) { return p.status === 'P'; })) hints.push('Someone is poisoned. Cast Cure (Garlic + Ginseng) or visit a healer.');
+      if (S.party.some(function(p) { return p.status === 'D'; })) hints.push('A party member is dead. A healer can resurrect them.');
+      if (S.party.length === 1) hints.push('You are alone. Companions can be recruited from the towns.');
+      this.el('hints').innerHTML = hints.length ? hints.map(function(h) { return '<div class="hint">' + e(h) + '</div>'; }).join('') :
+        '<div class="small">No warnings right now.</div>';
+
+      var q = this.quest(S);
+      this.el('steps').innerHTML = q.next.length ?
+        q.next.map(function(t) { return '<div class="next">' + t + '</div>'; }).join('') :
+        '<div class="small">Nothing left on the checklist.</div>';
+      this.el('checklist').innerHTML = q.groups.map(function(g) {
+        var done = g.items.filter(function(i) { return i.done; }).length;
+        return '<details><summary>' + e(g.title) + ' (' + done + '/' + g.items.length + ')</summary><ul class="check">' +
+          g.items.map(function(i) { return '<li class="' + (i.done ? 'done' : '') + '">' + i.text + '</li>'; }).join('') + '</ul></details>';
+      }).join('');
+
+      this.el('virtues').innerHTML = this.VIRTUES.map(function(v, i) {
+        var val = S.virt[i], done = val === 0, rune = (S.runes & (1 << i)) !== 0, rl = self.findLabel(v[0].toLowerCase() + 'rune');
+        return '<div class="virtue' + (done ? ' done' : '') + '"><span>' + e(v[0]) + '</span>' +
+          '<div class="bar"><i style="width:' + (done ? 100 : val) + '%"></i></div><span class="v">' + (done ? 'Avatar' : val) + '</span>' +
+          '<div class="vhint">' + (rune ? 'Rune found' : 'Rune: ' + (rl ? e(rl.where) + ' ' + self.at(rl) : 'unknown')) + ' &middot; mantra ' + e(v[1]) + '</div></div>';
+      }).join('');
+
+      this.el('quest').innerHTML =
+        '<div class="small">Runes</div>' + this.chips(this.VIRTUES.map(function(v, i) { return [1 << i, v[0]]; }), S.runes) +
+        '<div class="small" style="margin-top:6px">Stones</div>' + this.chips(this.STONES, S.stones) +
+        '<div class="small" style="margin-top:6px">Items</div>' + this.chips(this.ITEMS, S.items);
+
+      this.drawMap(S);
+    },
+
+    // Per-town (and dungeon/shrine) guide, from the game's map data.
+    townGuide: function(S, town, dng, shr) {
+      var self = this, e = this.esc, out = [];
+      if (town) {
+        var kinds = {towne: 'Town', village: 'Village', castle: 'Castle', ruins: 'Ruins'};
+        out.push('<b class="t">' + e(this.townName(town)) + '</b> <span class="k small">' + e(kinds[town.kind] || '') +
+          (town.wx !== undefined ? ' &middot; on the overworld at ' + town.wx + ', ' + town.wy : '') + '</span>');
+        var svc = Object.keys(town.roles).map(function(r) {
+          var n = town.roles[r], label = self.ROLES[r] || r;
+          return e(label) + (n > 1 && r !== 'companion' ? ' (' + n + ')' : '');
+        });
+        if (svc.length) out.push('<div class="small" style="margin-top:3px">Here: ' + svc.join(', ') + '.</div>');
+        var li = town.labels.map(function(l) { return self.labelLine(S, l); }).filter(Boolean);
+        if (li.length) out.push('<ul>' + li.join('') + '</ul><div class="small">Stand on a marked spot and press S to search for it.</div>');
+        else out.push('<div class="small" style="margin-top:3px">No quest items are marked in this place.</div>');
+      } else if (dng) {
+        out.push('<b class="t">Dungeon ' + e(dng.name) + '</b> <span class="k small">&middot; entrance at ' + dng.wx + ', ' + dng.wy + '</span>');
+        var st = dng.labels.map(function(l) { return l.k.replace('stone', ''); });
+        out.push('<div class="small" style="margin-top:3px">' + (st.length ? 'A ' + e(st.join(', ')) + ' stone is kept in this dungeon.' : 'No stone is marked in this dungeon.') + '</div>');
+      } else if (shr) {
+        out.push('<b class="t">Shrine of ' + e(shr.virtue) + '</b>');
+        out.push('<div class="small" style="margin-top:3px">The mantra is <b>' + e(shr.mantra) + '</b>. With the virtue at 99, meditate for 3 cycles, entering the mantra each time, to achieve Avatarhood.</div>');
+      } else return '';
+      return '<div class="town">' + out.join('') + '</div>';
+    },
+    labelLine: function(S, l) {
+      var e = this.esc, k = l.k, what = null, have = false;
+      var runeIdx = -1;
+      this.VIRTUES.forEach(function(v, i) { if (k === v[0].toLowerCase() + 'rune') runeIdx = i; });
+      if (runeIdx >= 0) { what = 'Rune of ' + this.VIRTUES[runeIdx][0]; have = (S.runes & (1 << runeIdx)) !== 0; }
+      else if (k === 'book') { what = 'Book of Truth'; have = (S.items & 0x08) !== 0; }
+      else if (k === 'candle') { what = 'Candle of Love'; have = (S.items & 0x04) !== 0; }
+      else if (k === 'mysticarmor') what = 'Mystic Armor (needs every virtue at Avatar)';
+      else if (k === 'mysticswords') what = 'Mystic Swords (needs every virtue at Avatar)';
+      else if (k === 'telescope') what = 'Telescope';
+      else return '';
+      var here = this.townIs(S, l);
+      return '<li>' + e(what) + ' at ' + this.at(l) + (have ? ' &mdash; <span style="color:var(--good)">you have it</span>' :
+        here ? ' &mdash; ' + e(this.direction(l.x - S.x, l.y - S.y)) : '') + '</li>';
+    },
+    townIs: function() { return true; },   // labels are only listed for the town you are in
+
+    // Quest checklist, from the game's own rules (item.cpp, shrine.cpp) and map data.
+    quest: function(S) {
+      var self = this, e = this.esc, groups = [], next = [], i;
+      var rec = function(done, text) { return {done: done, text: text}; };
+      var loc = function(l) { return l ? ' in ' + e(l.where) + (l.x !== undefined ? ' ' + self.at(l) : '') : ''; };
+
+      var runes = [];
+      this.VIRTUES.forEach(function(v, i) {
+        var have = (S.runes & (1 << i)) !== 0, l = self.findLabel(v[0].toLowerCase() + 'rune');
+        runes.push(rec(have, 'Rune of ' + e(v[0]) + (have ? '' : ' &mdash; ' + loc(l).replace(/^ in /, ''))));
+        if (!have && next.length < 3 && l) next.push('Find the <b>Rune of ' + e(v[0]) + '</b> in ' + e(l.where) + ' ' + self.at(l) + '. You need it to enter the shrine.');
+      });
+      groups.push({title: 'Runes', items: runes});
+
+      var virt = [];
+      this.VIRTUES.forEach(function(v, i) {
+        var val = S.virt[i], sh = self.shrineFor(i), have = (S.runes & (1 << i)) !== 0;
+        var place = sh && sh.wx !== undefined ? ' at ' + sh.wx + ', ' + sh.wy : '';
+        if (val === 0) { virt.push(rec(true, e(v[0]) + ': Avatar')); return; }
+        if (val >= 99) {
+          virt.push(rec(false, e(v[0]) + ' is at 99: meditate at the Shrine of ' + e(v[0]) + place + ' (mantra ' + e(v[1]) + ')' + (have ? '' : ', after finding its rune')));
+          if (have && next.length < 3) next.push('Meditate at the <b>Shrine of ' + e(v[0]) + '</b>' + place + ': 3 cycles, mantra <b>' + e(v[1]) + '</b>.');
+        } else virt.push(rec(false, e(v[0]) + ': ' + val + ' / 99 &mdash; raise it by practising the virtue'));
+      });
+      groups.push({title: 'Virtues', items: virt});
+      var lowest = -1;
+      S.virt.forEach(function(v, i) { if (v > 0 && v < 99 && (lowest < 0 || v < S.virt[lowest])) lowest = i; });
+      if (lowest >= 0 && next.length < 3) next.push('Your lowest virtue is <b>' + e(this.VIRTUES[lowest][0]) + '</b> (' + S.virt[lowest] + ' / 99).');
+
+      var stones = [], stoneNames = {1: 'blue', 2: 'yellow', 4: 'red', 8: 'green', 16: 'orange', 32: 'purple', 64: 'white', 128: 'black'};
+      this.STONES.forEach(function(s) {
+        var have = (S.stones & s[0]) !== 0, nm = stoneNames[s[0]], l = self.findLabel(nm + 'stone'), t;
+        if (l && l.dungeon) t = 'in Dungeon ' + e(l.where) + ' (entrance ' + l.wx + ', ' + l.wy + ')';
+        else if (l) t = 'on the overworld at ' + self.at(l);
+        else t = '';
+        if (nm === 'black') t += (t ? ', ' : '') + 'only when both moons are new';
+        stones.push(rec(have, e(s[1]) + ' stone' + (have ? '' : ' &mdash; ' + t)));
+        if (!have && next.length < 3 && S.runes === 255) next.push('Collect the <b>' + e(s[1]) + ' stone</b> ' + t + '.');
+      });
+      groups.push({title: 'Stones', items: stones});
+
+      var items = [];
+      var add = function(bit, name, key, extra, usedBit) {
+        var have = (S.items & bit) !== 0 || (usedBit && (S.items & usedBit)), l = self.findLabel(key);
+        var t = l ? (l.world ? 'on the overworld at ' + self.at(l) : 'in ' + e(l.where) + ' ' + self.at(l)) : '';
+        items.push(rec(!!have, e(name) + (have ? '' : ' &mdash; ' + t + (extra ? ' ' + extra : ''))));
+      };
+      add(0x10, 'Bell of Courage', 'bell', '', 0x1000);
+      add(0x08, 'Book of Truth', 'book', '', 0x800);
+      add(0x04, 'Candle of Love', 'candle', '', 0x400);
+      add(0x100, 'Silver Horn', 'horn');
+      add(0x200, 'Wheel of the HMS Cape', 'wheel');
+      add(0x01, 'Skull of Mondain', 'skull', '(only when both moons are new)', 0x02);
+      [[0x80, 'Truth'], [0x40, 'Love'], [0x20, 'Courage']].forEach(function(k) {
+        items.push(rec((S.items & k[0]) !== 0, 'Key of ' + k[1] + ' (one third of the Three Part Key) &mdash; found in an altar room by using your stones'));
+      });
+      groups.push({title: 'Items', items: items});
+
+      var aby = [];
+      var ab = GUIDE.dungeons[24];
+      var where = ab && ab.wx !== undefined ? ' at ' + ab.wx + ', ' + ab.wy : '';
+      aby.push(rec((S.items & 0x1000) !== 0, 'Ring the Bell on the Abyss entrance' + where));
+      aby.push(rec((S.items & 0x800) !== 0, 'Then use the Book there'));
+      aby.push(rec((S.items & 0x400) !== 0, 'Then light the Candle there'));
+      aby.push(rec((S.items & 0x02) !== 0, 'Cast the Skull of Mondain into the Abyss from the entrance'));
+      groups.push({title: 'The Abyss', items: aby});
+      if (!(S.items & 0x1000) && S.runes === 255 && S.stones === 255 && (S.items & 0x1c) === 0x1c && next.length < 3)
+        next.push('Go to the <b>Abyss entrance</b>' + where + ': use the Bell, then the Book, then the Candle.');
+
+      return {groups: groups, next: next};
+    }
+  };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
