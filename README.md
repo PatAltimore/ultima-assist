@@ -47,7 +47,7 @@ Effects and music are read from the game module and decoded in the engine: Ogg V
 
 ## Assist sidebar
 
-The sidebar has three tabs, remembered between visits: **Status** (where you are with the town guide, party, supplies), **Explore** (automap, hints with a count badge, assist buttons, sound, forget data) and **Quest** (checklist and next steps, virtues, quest items). Everything is live from the `assist_*` exports.
+The sidebar has three tabs, remembered between visits: **Status** (where you are with the town guide, party, supplies), **Explore** (automap, hints with a count badge, reference links, assist buttons, sound, forget data) and **Quest** (checklist and next steps, virtues, quest items). Everything is live from the `assist_*` exports.
 - **Town guide:** in a town, castle or village it lists the services (healer, inn, shops, companion), and any rune or quest item marked there, with the direction from where you stand (for example "Rune of Honesty at (8, 6): 9 north, 7 east"; confirmed in-game by walking there and pressing S). Dungeons show their stone; shrines show the mantra.
 - **Quest checklist:** runes, virtues (raise to 99, then meditate 3 cycles with the mantra), stones, the bell/book/candle/horn/wheel/skull, the three key parts and the Abyss steps, with the next three things to do. The rules come from the engine source (`item.cpp`, `shrine.cpp`, `party.cpp`).
 - **Automap:** the real overworld terrain (read from the engine), revealed as you explore (radius 5), with towns, dungeons, shrines and moongates marked, filled in once visited. Hover for names; a checkbox shows the whole map. Progress is kept in the browser (`localStorage`) and cleared by "Forget game data".
