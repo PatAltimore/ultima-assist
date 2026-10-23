@@ -88,6 +88,10 @@ public:
     bool hasInitiatedNewGame();
     int  selectedMusic() const { return introMusic; }
 
+    // ultima-assist: read-only view of the gypsy's questions for the sidebar help.
+    int  assistRound() const { return questionRound; }
+    int  assistTree(int i) const { return (i >= 0 && i < 15) ? questionTree[i] : -1; }
+
     bool present();
     void conclude();
     bool keyPressed(int key);

@@ -805,10 +805,24 @@ void IntroController::updateScreen() {
  * Initiate a new savegame by reading the name, sex, then presenting a
  * series of questions to determine the class of the new character.
  */
+/*
+ * ultima-assist: which step of character creation is showing, for the web
+ * sidebar's help (see assist.cpp).  0 = none, 1 = name, 2 = sex, 3 = the
+ * story, 4 = the gypsy's questions, 5 = finishing up.
+ */
+int assist_intro_phase = 0;
+
+struct AssistPhaseGuard {
+    ~AssistPhaseGuard() { assist_intro_phase = 0; }
+};
+
 void IntroController::initiateNewGame() {
+    AssistPhaseGuard assistGuard;
+
     // draw the extended background for all option screens
     backgroundArea.draw(BKGD_INTRO);
     backgroundArea.draw(BKGD_OPTIONS_BTM, 0, 120);
+    assist_intro_phase = 1;
 
     // display name prompt and read name from keyboard
     menuArea.textAt(3, 3, "By what name shalt thou be known");
@@ -834,6 +848,7 @@ void IntroController::initiateNewGame() {
     backgroundArea.draw(BKGD_OPTIONS_BTM, 0, 120);
 
     // display sex prompt and read sex from keyboard
+    assist_intro_phase = 2;
     menuArea.textAt(3, 3, "Art thou Male or Female?");
 
     // the cursor is already enabled, just change its position
@@ -858,18 +873,22 @@ void IntroController::initiateNewGame() {
 
 void IntroController::finishInitiateGame(const string &nameBuffer, SexType sex)
 {
+    AssistPhaseGuard assistGuard;
     {
     uint16_t saveGroup = xu4_setResourceGroup(StageIntro);
 
     // show the lead up story
+    assist_intro_phase = 3;
     showStory();
     if (xu4.stage != StageIntro)
         return;
 
     // ask questions that determine character class
+    assist_intro_phase = 4;
     startQuestions();
     if (xu4.stage != StageIntro)
         return;
+    assist_intro_phase = 5;
 
     xu4_setResourceGroup(saveGroup);
     }

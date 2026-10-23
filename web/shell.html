@@ -80,6 +80,12 @@
   #tabs [role=tab][aria-selected=true] { color: #fff; background: #242424; border-color: var(--line); margin-bottom: -1px; }
   #tabs [role=tab]:focus-visible { outline: 2px solid #6aa0e0; outline-offset: -2px; }
   .badge { display: inline-block; min-width: 1.2em; padding: 0 .35em; border-radius: 10px; background: var(--warn); color: #111; font-size: .75em; font-weight: 600; text-align: center; }
+  .cc h2 { margin-top: 0 !important; }
+  .cc .opt { background: #202020; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: .9em; }
+  .cc .opt p { margin: 4px 0; }
+  .cc .opt b.t { font-size: 1.05em; }
+  .cc ul { margin: 4px 0; padding-left: 1.2em; }
+  .cc .stat { display: inline-block; padding: 0 .45em; margin: 0 4px 2px 0; border: 1px solid var(--line); border-radius: 10px; font-size: .85em; }
   #waiting { color: var(--dim); }
   details { margin: 4px 0; }
   details > summary { cursor: pointer; color: #cfcfcf; }
@@ -126,6 +132,7 @@
 
   <aside id="assist" aria-label="Assist mode">
     <div id="waiting">Assist mode starts once you begin or load a game.</div>
+    <div id="create" class="cc" hidden></div>
     <div id="live" hidden>
       <div id="tabs" role="tablist" aria-label="Assist sections">
         <button type="button" role="tab" id="tab-status" data-tab="status" aria-controls="panel-status" aria-selected="true">Status</button>
@@ -154,6 +161,8 @@
         <label class="small"><input type="checkbox" id="showAll"> Show the whole map (spoilers)</label>
         <h2>Hints</h2>
         <div id="hints"></div>
+        <h2>Manual</h2>
+        <p class="small"><a href="https://archive.org/download/c64man_ultima4/c64man_ultima4.pdf" target="_blank" rel="noopener noreferrer">Ultima IV manual (PDF)</a><br>The original Commodore 64 manual, hosted by the Internet Archive (about 1.5 MB). It was written for the C64 version, so some details, such as controls, may differ here.</p>
         <h2>Assist</h2>
         <div class="actions">
           <button type="button" data-act="heal">Heal party</button>
@@ -306,6 +315,142 @@
       e.stopImmediatePropagation();
     }, true);
   });
+
+  // Character-creation help: explains each step of "Initiate New Game" and how the
+  // answers shape the character.  The rules are the engine's own
+  // (engine/src/intro.cpp, party.cpp); the engine tells us which step is showing.
+  var Create = {
+    VIRTUES: ['Honesty', 'Compassion', 'Valor', 'Justice', 'Sacrifice', 'Honor', 'Spirituality', 'Humility'],
+    // Starting-stat bonus per pick: [strength, dexterity, intelligence].
+    BONUS: [[0, 0, 3], [0, 3, 0], [3, 0, 0], [0, 1, 1], [1, 1, 0], [1, 0, 1], [1, 1, 1], [0, 0, 0]],
+    // Class a virtue leads to if it wins the last question (same order as VIRTUES).
+    CLASSES: [
+      { name: 'Mage',     weapon: 'staff',  armor: 'cloth',   hp: 200, mp: 'twice your Intelligence',     town: 'Moonglow' },
+      { name: 'Bard',     weapon: 'sling',  armor: 'cloth',   hp: 300, mp: 'your Intelligence',           town: 'Britain' },
+      { name: 'Fighter',  weapon: 'axe',    armor: 'leather', hp: 300, mp: 'none',                        town: 'Jhelom' },
+      { name: 'Druid',    weapon: 'dagger', armor: 'cloth',   hp: 200, mp: '1.5 times your Intelligence', town: 'Yew' },
+      { name: 'Tinker',   weapon: 'mace',   armor: 'leather', hp: 200, mp: 'half your Intelligence',      town: 'Minoc' },
+      { name: 'Paladin',  weapon: 'sword',  armor: 'chain',   hp: 300, mp: 'your Intelligence',           town: 'Trinsic' },
+      { name: 'Ranger',   weapon: 'sword',  armor: 'leather', hp: 200, mp: 'your Intelligence',           town: 'Skara Brae' },
+      { name: 'Shepherd', weapon: 'staff',  armor: 'cloth',   hp: 100, mp: 'none',                        town: 'Magincia' }
+    ],
+    last: '',
+    el: function(id) { return document.getElementById(id); },
+    esc: function(x) { return String(x).replace(/[&<>"]/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); },
+    bonusText: function(v) {
+      var b = this.BONUS[v], n = ['Strength', 'Dexterity', 'Intelligence'], out = [];
+      for (var i = 0; i < 3; i++) if (b[i]) out.push('+' + b[i] + ' ' + n[i]);
+      return out.length ? out.join(', ') : 'no stat bonus';
+    },
+    // What the picks so far add up to.
+    totals: function(picks) {
+      var st = [15, 15, 15], vir = [50, 50, 50, 50, 50, 50, 50, 50];
+      for (var k = 0; k < picks.length; k++) {
+        var v = picks[k];
+        vir[v] += 5;
+        for (var i = 0; i < 3; i++) st[i] += this.BONUS[v][i];
+      }
+      return { st: st, vir: vir };
+    },
+    statChips: function(t) {
+      return '<span class="stat">Strength ' + t.st[0] + '</span><span class="stat">Dexterity ' + t.st[1] + '</span><span class="stat">Intelligence ' + t.st[2] + '</span>';
+    },
+    mp: function(cls, intel) {
+      var m = [intel * 2, intel, 0, Math.floor(intel * 3 / 2), Math.floor(intel / 2), intel, intel, 0][cls];
+      return Math.min(99, m);
+    },
+    classCard: function(v, intel, label) {
+      var c = this.CLASSES[v], e = this.esc, mp = this.mp(v, intel);
+      return '<b class="t">' + (label ? e(label) + ' ' : '') + e(c.name) + '</b>' +
+        '<ul><li>Starts with a ' + e(c.weapon) + ' and ' + e(c.armor) + ' armor, and ' + c.hp + ' hit points.</li>' +
+        '<li>Magic points: ' + e(c.mp) + (c.mp === 'none' ? ' (this class cannot cast spells)' : ' (about ' + mp + ' with your picks)') + '.</li>' +
+        '<li>You begin the game near ' + e(c.town) + '.</li></ul>';
+    },
+
+    poll: function() {
+      var ph = Module._assist_intro_phase_now ? Module._assist_intro_phase_now() : 0;
+      var show = ph > 0;
+      this.el('create').hidden = !show;
+      this.el('waiting').hidden = show;
+      if (!show) { this.last = ''; return; }
+      var round = Module._assist_intro_round(), tree = [];
+      for (var i = 0; i < 15; i++) tree.push(Module._assist_intro_tree(i));
+      var key = ph + '|' + round + '|' + tree.join(',');
+      if (key === this.last) return;
+      this.last = key;
+      this.el('create').innerHTML = this.render(ph, round, tree);
+    },
+
+    render: function(ph, round, tree) {
+      var e = this.esc, V = this.VIRTUES, self = this, html = '<h2>Creating your character</h2>';
+      if (ph === 1) {
+        return html + '<div class="opt"><b class="t">Your name</b><p>Type a name and press Enter. Esc takes you back to the menu.</p>' +
+          '<p>The name is just a label: it appears in the party list and on the stats screen, and has no effect on gameplay.</p></div>' +
+          '<p class="small">Next come: male or female, a short story, and seven questions from the gypsy. The questions decide your class.</p>';
+      }
+      if (ph === 2) {
+        return html + '<div class="opt"><b class="t">Male or female?</b>' +
+          '<p>This only changes the symbol shown beside your name on the stats screen. It does not change your class, your stats or the questions that follow.</p></div>';
+      }
+      if (ph === 3) {
+        return html + '<div class="opt"><b class="t">The story</b><p>Read at your own pace; press Space to turn each page. The gypsy then asks seven questions.</p></div>' +
+          this.howItWorks();
+      }
+      var picks, t;
+      if (ph === 5) {
+        picks = tree.slice(8, 15);
+        var cls = tree[14];
+        t = this.totals(picks);
+        return html + '<div class="opt"><b class="t">Your character</b><p>The gypsy has chosen: you are a <b>' + e(this.CLASSES[cls].name) + '</b>.</p>' +
+          '<div>' + this.statChips(t) + '</div>' + this.classCard(cls, t.st[2]) +
+          '<p class="small">Your starting virtues are ' + V.map(function(n, i) { return n + ' ' + t.vir[i]; }).join(', ') + '.</p>' +
+          '<p class="small">The other seven classes are waiting in the eight virtue towns as companions you can recruit.</p></div>';
+      }
+
+      // ph === 4: one of the seven questions
+      var a = tree[2 * round], b = tree[2 * round + 1];
+      if (a < 0 || b < 0) return html;
+      picks = tree.slice(8, 8 + round);
+      t = this.totals(picks);
+      var alive = tree.slice(2 * round, 8 + round).filter(function(v, i, arr) { return v >= 0 && arr.indexOf(v) === i; });
+      var last = round === 6;
+
+      html += '<div class="opt"><b class="t">Question ' + (round + 1) + ' of 7</b>' +
+        '<p>' + (last ? 'This is the deciding question: the virtue you choose now becomes your class.'
+                      : 'Choose between the two virtues on the cards. A is the left card, B the right.') + '</p></div>';
+
+      [[a, 'A', b], [b, 'B', a]].forEach(function(o) {
+        var v = o[0], other = o[2], n = picks.filter(function(p) { return p === v; }).length;
+        var li = '<li>Adds +5 to your starting ' + e(V[v]) + ' (it begins at 50' + (n ? ', already ' + (50 + 5 * n) + ' from earlier picks' : '') + ').</li>' +
+                 '<li>Stat bonus: ' + e(self.bonusText(v)) + '.</li>';
+        if (last) li += '<li>You become a <b>' + e(self.CLASSES[v].name) + '</b>.</li>';
+        else li += '<li>Keeps ' + e(V[v]) + ' (a ' + e(self.CLASSES[v].name) + ') in the running, and drops ' + e(V[other]) + ' (a ' + e(self.CLASSES[other].name) + ') from it.</li>';
+        html += '<div class="opt"><b class="t">Option ' + o[1] + ': ' + e(V[v]) + '</b><ul>' + li + '</ul></div>';
+      });
+
+      if (last) {
+        html += '<div class="opt">' + self.classCard(a, t.st[2] + self.BONUS[a][2], 'If A:') + '</div>' +
+                '<div class="opt">' + self.classCard(b, t.st[2] + self.BONUS[b][2], 'If B:') + '</div>';
+      } else {
+        html += '<div class="opt"><b class="t">Classes still possible</b><div style="margin-top:4px">' +
+          alive.map(function(v) { return '<span class="stat">' + e(self.CLASSES[v].name) + '</span>'; }).join('') + '</div></div>';
+      }
+
+      html += '<div class="opt"><b class="t">So far</b>' +
+        (picks.length ? '<p>You have picked ' + picks.map(function(v) { return e(V[v]); }).join(', ') + '.</p>' : '<p>No picks yet.</p>') +
+        '<div>' + this.statChips(t) + '</div></div>';
+      return html + this.howItWorks();
+    },
+
+    howItWorks: function() {
+      return '<details><summary>How the seven questions work</summary><ul>' +
+        '<li>The eight virtues are paired off. Each question picks one virtue from a pair; your pick moves on and the other drops out.</li>' +
+        '<li>The last virtue standing decides your class: Honesty is a Mage, Compassion a Bard, Valor a Fighter, Justice a Druid, Sacrifice a Tinker, Honor a Paladin, Spirituality a Ranger and Humility a Shepherd.</li>' +
+        '<li>Every pick you make (all seven) adds +5 to that virtue\'s starting value (base 50) and a stat bonus. A virtue picked again and again stacks.</li>' +
+        '<li>Your class sets your starting gear, hit points, magic points and where you begin. Virtues start at 50 and reach Avatarhood at 99, so a higher start is a small head start.</li>' +
+        '<li>There is no wrong answer: the other seven classes can still join you as companions.</li></ul></details>';
+    }
+  };
 
   // Sidebar tabs (Status / Explore / Quest); the choice is remembered.
   var Tabs = {
@@ -736,7 +881,8 @@
       var live = this.call('get_stage') === 1;
       this.el('waiting').hidden = live;
       this.el('live').hidden = !live;
-      if (!live) { this.last = ''; return; }
+      if (!live) { this.last = ''; Create.poll(); return; }
+      this.el('create').hidden = true;
 
       var c = this, S = {}, i;
       S.name = c.str(c.call('loc_name')); S.type = c.call('loc_type'); S.mapId = c.call('loc_map_id');

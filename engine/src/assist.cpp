@@ -10,6 +10,7 @@
 #include <string.h>
 #include <emscripten.h>
 #include "context.h"
+#include "intro.h"
 #include "map.h"
 #include "savegame.h"
 #include "tile.h"
@@ -35,6 +36,35 @@ static inline const SaveGamePlayerRecord* member(int i)
 
 // 0 = title/intro, 1 = playing.
 EXPORT int assist_get_stage(void) { return liveSave() ? 1 : 0; }
+
+// --- Character creation ---------------------------------------------------
+
+extern int assist_intro_phase;      // intro.cpp
+
+static inline IntroController* creating()
+{
+    return (xu4.stage == StageIntro && xu4.intro) ? xu4.intro : NULL;
+}
+
+// 0 none, 1 name, 2 sex, 3 story, 4 the gypsy's questions, 5 finishing up.
+EXPORT int assist_intro_phase_now(void)
+{
+    return creating() ? assist_intro_phase : 0;
+}
+
+// Which of the seven questions is showing (0-6).
+EXPORT int assist_intro_round(void)
+{
+    IntroController* ic = creating();
+    return ic ? ic->assistRound() : 0;
+}
+
+// The question bracket: 0-7 are the virtues in play, 8-14 the picks so far.
+EXPORT int assist_intro_tree(int i)
+{
+    IntroController* ic = creating();
+    return ic ? ic->assistTree(i) : -1;
+}
 
 // --- Party ---------------------------------------------------------------
 
